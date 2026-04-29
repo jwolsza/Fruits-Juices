@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Project.Zone1.Trucks;
+using Project.Core;
 
 namespace Project.Zone2.Bottling
 {
@@ -10,17 +10,17 @@ namespace Project.Zone2.Bottling
         /// Priorytet 2: butelka pusta (unreserved).
         /// Inaczej null — truck musi czekać.
         /// </summary>
-        public static BigBottle FindBottleFor(Truck truck, IReadOnlyList<BigBottle> bottles)
+        public static BigBottle FindBottleFor(FruitType truckFruitColor, int truckLoad, IReadOnlyList<BigBottle> bottles)
         {
-            if (truck == null || bottles == null) return null;
+            if (bottles == null) return null;
 
             BigBottle anyEmpty = null;
 
             foreach (var b in bottles)
             {
                 if (b.CurrentType.HasValue
-                    && b.CurrentType.Value == truck.FruitColor
-                    && b.FillAmount + truck.Load <= b.Capacity)
+                    && b.CurrentType.Value == truckFruitColor
+                    && b.FillAmount + truckLoad <= b.Capacity)
                 {
                     return b;
                 }

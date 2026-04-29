@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using Project.Core;
 using Project.Data;
-using Project.Zone1.Trucks;
 
 namespace Project.Zone2.Bottling
 {
@@ -41,7 +40,8 @@ namespace Project.Zone2.Bottling
             }
         }
 
-        public BigBottle TryRouteTruckToBottle(Truck truck) => BigBottleRouter.FindBottleFor(truck, bottles);
+        public BigBottle TryRouteTruck(FruitType truckFruitColor, int truckLoad) =>
+            BigBottleRouter.FindBottleFor(truckFruitColor, truckLoad, bottles);
 
         public Vector3 GetBottleWorldPosition(BigBottle bottle)
         {
@@ -51,11 +51,10 @@ namespace Project.Zone2.Bottling
             return bottleViews[idx].DumpAnchorWorldPosition;
         }
 
-        public void DepositTruckLoad(Truck truck, BigBottle bottle)
+        public void Deposit(BigBottle bottle, FruitType type, int amount)
         {
-            if (truck == null || bottle == null) return;
-            bottle.Receive(truck.FruitColor, truck.Load);
-            truck.EmptyLoad();
+            if (bottle == null) return;
+            bottle.Receive(type, amount);
         }
 
         void Update()

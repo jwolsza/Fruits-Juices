@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using Project.Core;
 using Project.Data;
 using Project.Zone1.FruitWall;
+using Project.Zone2.Bottling;
 
 namespace Project.Zone1.Trucks
 {
@@ -48,11 +49,20 @@ namespace Project.Zone1.Trucks
         [SerializeField] FlyingFruitPool flyingFruitPool;
         [SerializeField] FruitWall.WallView wallView;
 
+        [Header("Zone 2 (bottling)")]
+        [SerializeField] Zone2Manager zone2Manager;
+        [Tooltip("Distance threshold (world) below which truck is considered arrived at dump target.")]
+        [SerializeField] float dumpArriveDistance = 0.3f;
+        [Tooltip("Czas trwania stanu Dumping (sec) zanim truck wraca do garażu.")]
+        [SerializeField] float dumpDurationSec = 0.6f;
+
         ConveyorTrack track;
         Garage garage;
         readonly List<Truck> trucks = new();
         readonly Dictionary<int, TruckView> truckViews = new();
         readonly List<int> waitingDispatchQueue = new();
+        readonly Dictionary<int, BigBottle> truckTargetBottles = new();
+        readonly Dictionary<int, float> truckDumpTimer = new();
         int nextTruckId = 1;
 
         float magnetAccumulator;
@@ -146,6 +156,7 @@ namespace Project.Zone1.Trucks
             }
 
             HandleFullTrucks();
+            ProcessBottleRouting(dt);
         }
 
         void HandleTapDispatch()
@@ -311,12 +322,69 @@ namespace Project.Zone1.Trucks
             {
                 if (truck.State != TruckState.OnConveyor) continue;
                 if (!truck.IsFull) continue;
+
+                // Try to route to a compatible bottle. If no Zone2 or no compatible bottle —
+                // fall back to direct return to garage (placeholder behavior).
+                BigBottle bottle = zone2Manager != null
+                    ? zone2Manager.TryRouteTruck(truck.FruitColor, truck.Load)
+                    : null;
+
                 track.RemoveTruckFromSlot(truck);
-                truck.State = TruckState.InGarage;
-                truck.EmptyLoad();
-                if (truckViews.TryGetValue(truck.Id, out var view))
-                    view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
                 waitingDispatchQueue.Remove(truck.Id);
+
+                if (bottle != null)
+                {
+                    truck.State = TruckState.DrivingToBottle;
+                    truck.DumpTargetWorldPos = zone2Manager.GetBottleWorldPosition(bottle);
+                    truckTargetBottles[truck.Id] = bottle;
+                }
+                else
+                {
+                    truck.State = TruckState.ReturningToGarage;
+                    truck.EmptyLoad();
+                    if (truckViews.TryGetValue(truck.Id, out var view))
+                        view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                }
+            }
+        }
+
+        void ProcessBottleRouting(float dt)
+        {
+            foreach (var truck in trucks)
+            {
+                if (truck.State == TruckState.DrivingToBottle)
+                {
+                    if (!truckViews.TryGetValue(truck.Id, out var view) || view == null) continue;
+                    float dist = Vector3.Distance(view.transform.position, truck.DumpTargetWorldPos);
+                    if (dist <= dumpArriveDistance)
+                    {
+                        if (truckTargetBottles.TryGetValue(truck.Id, out var bottle) && zone2Manager != null)
+                            zone2Manager.Deposit(bottle, truck.FruitColor, truck.Load);
+                        truck.EmptyLoad();
+                        truck.State = TruckState.Dumping;
+                        truckDumpTimer[truck.Id] = dumpDurationSec;
+                    }
+                }
+                else if (truck.State == TruckState.Dumping)
+                {
+                    float t = truckDumpTimer.TryGetValue(truck.Id, out var v) ? v - dt : 0f;
+                    truckDumpTimer[truck.Id] = t;
+                    if (t <= 0f)
+                    {
+                        truck.State = TruckState.ReturningToGarage;
+                        truckTargetBottles.Remove(truck.Id);
+                        truckDumpTimer.Remove(truck.Id);
+                        if (truckViews.TryGetValue(truck.Id, out var view))
+                            view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                    }
+                }
+                else if (truck.State == TruckState.ReturningToGarage)
+                {
+                    if (!truckViews.TryGetValue(truck.Id, out var view) || view == null) continue;
+                    float dist = Vector3.Distance(view.transform.position, garageView.GetParkPositionFor(truck.Id));
+                    if (dist <= dumpArriveDistance)
+                        truck.State = TruckState.InGarage;
+                }
             }
         }
 

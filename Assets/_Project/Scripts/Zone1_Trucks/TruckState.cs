@@ -8,6 +8,8 @@ namespace Project.Zone1.Trucks
         OnConveyor,
         StoppedAtSlot,
         Full,
+        DrivingToBottle,
+        Dumping,
         ReturningToGarage,
     }
 }

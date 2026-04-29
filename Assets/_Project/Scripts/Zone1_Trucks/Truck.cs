@@ -1,4 +1,5 @@
 using Project.Core;
+using UnityEngine;
 
 namespace Project.Zone1.Trucks
 {
@@ -10,6 +11,7 @@ namespace Project.Zone1.Trucks
         public int Load { get; private set; }
         public TruckState State { get; set; } = TruckState.InGarage;
         public float TrackPosition { get; set; }
+        public Vector3 DumpTargetWorldPos { get; set; }
 
         public bool IsFull => Load >= Capacity;
 

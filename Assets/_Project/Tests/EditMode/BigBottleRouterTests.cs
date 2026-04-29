@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using Project.Core;
-using Project.Zone1.Trucks;
 using Project.Zone2.Bottling;
 
 namespace Project.Tests.EditMode
@@ -14,11 +13,8 @@ namespace Project.Tests.EditMode
             var b1 = new BigBottle(1, 200);
             b1.Receive(FruitType.Apple, 50);
 
-            var truck = new Truck(1, FruitType.Apple, 100);
-            for (int i = 0; i < 50; i++) truck.AddFruit();
-
-            var found = BigBottleRouter.FindBottleFor(truck, new[] { b0, b1 });
-            Assert.AreSame(b1, found, "should pick matching type bottle, not the empty one");
+            var found = BigBottleRouter.FindBottleFor(FruitType.Apple, 50, new[] { b0, b1 });
+            Assert.AreSame(b1, found);
         }
 
         [Test]
@@ -28,10 +24,7 @@ namespace Project.Tests.EditMode
             var b1 = new BigBottle(1, 200);
             b1.Receive(FruitType.Orange, 50);
 
-            var truck = new Truck(1, FruitType.Apple, 100);
-            for (int i = 0; i < 50; i++) truck.AddFruit();
-
-            var found = BigBottleRouter.FindBottleFor(truck, new[] { b0, b1 });
+            var found = BigBottleRouter.FindBottleFor(FruitType.Apple, 50, new[] { b0, b1 });
             Assert.AreSame(b0, found);
         }
 
@@ -43,10 +36,7 @@ namespace Project.Tests.EditMode
             b0.Receive(FruitType.Orange, 50);
             b1.Receive(FruitType.Lemon, 50);
 
-            var truck = new Truck(1, FruitType.Apple, 100);
-            for (int i = 0; i < 50; i++) truck.AddFruit();
-
-            var found = BigBottleRouter.FindBottleFor(truck, new[] { b0, b1 });
+            var found = BigBottleRouter.FindBottleFor(FruitType.Apple, 50, new[] { b0, b1 });
             Assert.IsNull(found);
         }
 
@@ -57,10 +47,7 @@ namespace Project.Tests.EditMode
             var b1 = new BigBottle(1, 100);
             b1.Receive(FruitType.Apple, 80); // 20 free
 
-            var truck = new Truck(1, FruitType.Apple, 100);
-            for (int i = 0; i < 50; i++) truck.AddFruit(); // truck has 50 — won't fit in 20
-
-            var found = BigBottleRouter.FindBottleFor(truck, new[] { b0, b1 });
+            var found = BigBottleRouter.FindBottleFor(FruitType.Apple, 50, new[] { b0, b1 });
             Assert.AreSame(b0, found);
         }
     }

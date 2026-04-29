@@ -6,7 +6,8 @@
         "Project.Data",
         "Project.Zone1.FruitWall",
         "Unity.InputSystem",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Project.Zone2.Bottling"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

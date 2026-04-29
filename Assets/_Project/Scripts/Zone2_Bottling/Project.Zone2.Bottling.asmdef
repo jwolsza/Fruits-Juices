@@ -5,7 +5,6 @@
         "Project.Core",
         "Project.Data",
         "Project.Zone1.FruitWall",
-        "Project.Zone1.Trucks",
         "Unity.InputSystem"
     ],
     "includePlatforms": [],
