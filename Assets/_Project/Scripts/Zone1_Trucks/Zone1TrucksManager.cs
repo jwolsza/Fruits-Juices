@@ -147,8 +147,15 @@ namespace Project.Zone1.Trucks
             int occupied = track.Slots.Count - track.EmptySlotCount;
             if (occupied + waitingDispatchQueue.Count >= track.Slots.Count) return; // path full, reject
 
-            // Try immediate assignment AT entry waypoint slot (only if a slot is sitting under entry now).
             float entryParam = track.GetWaypointTrackParam(entryWaypointIndex);
+
+            // Conveyor is fully empty AND no one queued → snap empty slot to entry, dispatch immediately.
+            if (occupied == 0 && waitingDispatchQueue.Count == 0)
+            {
+                if (track.ForceAssignTruckAt(truck, entryParam)) return;
+            }
+
+            // Slot already drifted into entry window → enter immediately.
             bool placed = waitingDispatchQueue.Count == 0
                 && track.TryAssignTruckAtTrackParam(truck, entryParam, entryWindowTrackParam);
             if (placed) return;

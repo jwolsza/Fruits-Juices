@@ -209,6 +209,27 @@ namespace Project.Zone1.Trucks
             }
         }
 
+        /// <summary>
+        /// Snaps the first empty slot to the given track position and assigns the truck.
+        /// Useful when conveyor is empty — bypasses the entry-window check so first truck
+        /// doesn't have to wait for a slot to drift to entry.
+        /// </summary>
+        public bool ForceAssignTruckAt(Truck truck, float trackPosition)
+        {
+            foreach (var slot in slots)
+            {
+                if (slot.IsEmpty)
+                {
+                    slot.TrackPosition = ((trackPosition % 1f) + 1f) % 1f;
+                    slot.Truck = truck;
+                    truck.TrackPosition = slot.TrackPosition;
+                    truck.State = TruckState.OnConveyor;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public void RemoveTruckFromSlot(Truck truck)
         {
             foreach (var slot in slots)
