@@ -195,30 +195,35 @@ namespace Project.Zone1.Trucks
 
         void UpdateSlotStopStates()
         {
+            // Reset all flags then mark at most ONE slot as stopped — the slot whose truck
+            // is closest to the stop wall slot AND can still collect. Otherwise trailing
+            // trucks clamped right behind would also fall in the stopWindow and freeze the
+            // whole queue.
+            foreach (var slot in track.Slots) slot.IsStopped = false;
+
             int stopSlotIdx = -1;
             for (int i = 0; i < wallSlots.Count; i++)
                 if (wallSlots[i].IsStopSlot) { stopSlotIdx = i; break; }
-            if (stopSlotIdx < 0)
-            {
-                foreach (var slot in track.Slots) slot.IsStopped = false;
-                return;
-            }
+            if (stopSlotIdx < 0) return;
 
             float stopParam = ApproximateTrackParamForWorldPos(wallSlots[stopSlotIdx].WorldPosition);
             const float stopWindow = 0.02f;
 
+            ConveyorSlot best = null;
+            float bestDist = stopWindow;
             foreach (var slot in track.Slots)
             {
-                if (slot.IsEmpty)
-                {
-                    slot.IsStopped = false;
-                    continue;
-                }
+                if (slot.IsEmpty) continue;
+                if (!CanTruckStillCollect(slot.Truck)) continue;
                 float dist = Mathf.Abs(((slot.TrackPosition - stopParam) + 1f) % 1f);
                 dist = Mathf.Min(dist, 1f - dist);
-                bool atStopPos = dist <= stopWindow;
-                slot.IsStopped = atStopPos && CanTruckStillCollect(slot.Truck);
+                if (dist <= bestDist)
+                {
+                    bestDist = dist;
+                    best = slot;
+                }
             }
+            if (best != null) best.IsStopped = true;
         }
 
         bool CanTruckStillCollect(Truck truck)
