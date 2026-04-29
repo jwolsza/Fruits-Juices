@@ -12,13 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e02076c66c0d9438a9a37927513eb0e8, type: 3}
   m_Name: GameBalance
   m_EditorClassIdentifier: Project.Data::Project.Data.GameBalanceSO
-  WallColumns: 1000
-  WallRows: 1000
-  GravityRateHz: 10
-  FruitSpawnRateHz: 2
-  MagnetRateHz: 5
+  WallColumns: 100
+  WallRows: 100
+  WallWidthWorldUnits: 5
+  WallHeightWorldUnits: 5
+  GravityRateHz: 30
+  RefillTickRateHz: 30
+  RefillSpawnsPerTick: 100
+  MagnetRateHz: 30
   ConveyorSlotCount: 4
-  TruckCapacity: 100
+  TruckCapacity: 300
   BigBottleCapacity: 200
   FruitsPerSmallBottle: 5
   RackCapacity: 30

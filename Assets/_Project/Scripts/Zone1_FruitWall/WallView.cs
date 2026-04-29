@@ -15,6 +15,21 @@ namespace Project.Zone1.FruitWall
         Color[,] lastColors;
         Sprite generatedSprite;
 
+        public Vector3 GetCellWorldPosition(int cellX, int cellY)
+        {
+            if (cellRenderers == null || grid == null) return transform.position;
+            if (cellX < 0 || cellX >= grid.Columns || cellY < 0 || cellY >= grid.Rows) return transform.position;
+            return cellRenderers[cellX, cellY].transform.position;
+        }
+
+        public Vector2 GetCellWorldSize()
+        {
+            if (cellRenderers == null || grid == null || grid.Columns == 0 || grid.Rows == 0)
+                return Vector2.one * 0.05f;
+            var scale = cellRenderers[0, 0].transform.lossyScale;
+            return new Vector2(Mathf.Abs(scale.x), Mathf.Abs(scale.y));
+        }
+
         Sprite ResolveSprite()
         {
             if (cellSprite != null) return cellSprite;
