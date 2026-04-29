@@ -13,6 +13,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] Transform boxPivot;
         [Tooltip("Opcjonalny TMP label (TextMeshPro 3D albo TextMeshProUGUI) — wyświetla procent napełnienia trucka (np. \"75%\").")]
         [SerializeField] TMP_Text fillPercentText;
+        [Tooltip("Szybkość obrotu na łukach toru (im więcej, tym szybsze nastawienie kierunku jazdy).")]
+        [SerializeField] float rotationSlerpSpeed = 10f;
 
         Truck truck;
         ConveyorTrack track;
@@ -95,7 +97,10 @@ namespace Project.Zone1.Trucks
                         Vector3 ahead = track.GetWorldPositionAtTrackParam((truck.TrackPosition + 0.001f) % 1f);
                         Vector3 fwd = (ahead - transform.position).normalized;
                         if (fwd.sqrMagnitude > 0.0001f)
-                            transform.rotation = Quaternion.LookRotation(fwd, Vector3.up);
+                        {
+                            Quaternion target = Quaternion.LookRotation(fwd, Vector3.up);
+                            transform.rotation = Quaternion.Slerp(transform.rotation, target, rotationSlerpSpeed * Time.deltaTime);
+                        }
                     }
                     break;
             }
