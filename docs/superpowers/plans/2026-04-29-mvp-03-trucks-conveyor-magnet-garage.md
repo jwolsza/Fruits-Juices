@@ -2,13 +2,37 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Strefa 1 wzbogacona o ciężarówki. Gracz tappuje ciężarówkę w garażu (przed ścianą, pod kamerą) → wjeżdża na conveyor (widoczny tor pętlący pod ścianą) → zbiera owoce magnetem z bottom row gridu w 3 aktywnych slotach → pełna jedzie z toru → na razie wraca do garażu (Plan #4 zastąpi to wizytą u dużej butelki). Conveyor pauzuje gdy `OnRefillingChanged.LastValue == true`.
+**Goal:** Strefa 1 wzbogacona o ciężarówki. Gracz tappuje ciężarówkę w garażu (przed ścianą, w przodzie pod kamerą) → wjeżdża na conveyor (widoczny tor pętlący przed dolną krawędzią ściany) → zbiera owoce magnetem z bottom row gridu w 3 aktywnych slotach → pełna jedzie z toru → na razie wraca do garażu (Plan #4 zastąpi to wizytą u dużej butelki). Conveyor pauzuje gdy `OnRefillingChanged.LastValue == true`.
 
-**Architecture:** Pure-logic warstwa (`Truck`, `TruckStateMachine`, `ConveyorTrack` z waypointami, `WallSlot`, `MagnetSystem`, `Garage`) testowalna unitowo. Unity warstwa: `TruckView` (ProBuilder cab+paka+koła), `ConveyorView` (widoczny tor — line renderer lub ProBuilder taśma), `GarageView` (parking + tap pickup), `Zone1TrucksManager` (orkiestrator strefy + integracja z `Zone1Manager` z Plan #2). Subscribe `OnRefillingChanged` → conveyor pause.
+**Architecture:** Pure-logic warstwa (`Truck`, `TruckStateMachine`, `ConveyorTrack`, `WallSlot`, `MagnetSystem`, `Garage`) testowalna unitowo. Unity warstwa: `TruckView` (ProBuilder cab+paka+koła), `ConveyorView` (LineRenderer pętla), `GarageView` (parking + tap pickup), `Zone1TrucksManager`. Subscribe `OnRefillingChanged` → conveyor pause.
 
-**Tech Stack:** Unity 6.3 URP, ProBuilder, SpriteRenderer (z Plan #2), Physics raycast (tap detection).
+**Plan numer:** 3/8 w sekwencji MVP. Spec: `docs/superpowers/specs/2026-04-29-fruits-juices-design.md` sekcje 3.2–3.7. Branch: `feat/mvp-step3`.
 
-**Plan numer:** 3/8 w sekwencji MVP. Spec: `docs/superpowers/specs/2026-04-29-fruits-juices-design.md` sekcje 3.2–3.7. Branch: `feat/mvp-step3` (utworzysz po merge'u step2).
+---
+
+## Scene Layout Reference (read from `Main.unity` przy pisaniu planu)
+
+Aktualna scena (jako baseline dla wszystkich koordynatów w tym planie):
+
+| Obiekt | World position | Rotation | Scale | Uwagi |
+|--------|---------------|----------|-------|-------|
+| `FirstZone` | (0, 0, 0) | identity | 1 | Root strefy 1 |
+| `Wall` (child of FirstZone) | local (-0.02, 2.68, -0.87) | -90° X | 0.45 | Lying horizontally, view from above-front |
+| `MainCamera` | (0, 4.62, -3.75) | ~45° X (looking down/forward) | 1 | Isometric-ish view |
+| `SecondZone` | (5, 0, 0) | identity | 1 | 5 units right of FirstZone |
+| `ThirdZone` | (5.3, 0, 1) | identity | 1 | |
+
+**Computed wall bounds in world space** (Wall.localScale 0.45 × balance.WallWidthWorldUnits 36 = 16.2 jednostek; rotacja -90° X przekłada local Y na world -Z):
+
+- Cell `(0, 0)` (bottom-left of grid logically) → world `(0, 2.68, -0.87)`
+- Cell `(299, 0)` (bottom-right) → world `(16.15, 2.68, -0.9)` — **bottom row najbliżej kamery**
+- Cell `(0, 299)` (top-left) → world `(0, 2.68, -17.04)` — **top row najdalej od kamery**
+- Cell `(299, 299)` → world `(16.15, 2.68, -17.04)`
+- Cell width in world = `36 * 0.45 / 300 = 0.054`
+
+**Wniosek:** ściana to płaski stół Y=2.68, fruity refilla "spadają" z `Z=-17` w kierunku `Z=-0.87` (czyli idą do kamery). Bottom row (gdzie ciężarówki zbierają) jest przy krawędzi `Z ≈ -0.87`.
+
+**Ground (Y=0)** jest 2.68 jednostki pod ścianą — tam jeżdżą ciężarówki.
 
 ---
 
@@ -18,40 +42,40 @@
 Assets/_Project/
 ├── Scripts/
 │   └── Zone1_Trucks/
-│       ├── Project.Zone1.Trucks.asmdef           [NEW] ref: Project.Core, Project.Data, Project.Zone1.FruitWall
-│       ├── TruckState.cs                          [NEW] enum: Idle, OnConveyor, Collecting, Full, ReturningToGarage
-│       ├── Truck.cs                               [NEW] data: FruitType color, capacity, current load, state
-│       ├── ConveyorWaypoint.cs                    [NEW] position + isActiveSlot bool
-│       ├── ConveyorTrack.cs                      [NEW] list of waypoints, MoveAlong with formation, Pause/Resume
-│       ├── WallSlot.cs                            [NEW] position + slotIndex (0,1,2 — slot 3 is "stop slot")
-│       ├── MagnetSystem.cs                       [NEW] per-tick: assign fruits from wall bottom row to trucks at slots
-│       ├── Garage.cs                              [NEW] list of parked Truck refs, Dispatch(truckId)
-│       ├── TruckView.cs                           [NEW] MonoBehaviour: holds Truck ref, syncs transform from Truck position
-│       ├── ConveyorView.cs                       [NEW] MonoBehaviour: builds visible track from waypoints
-│       ├── GarageView.cs                          [NEW] MonoBehaviour: lays out parked TruckViews + raycast tap detection
-│       └── Zone1TrucksManager.cs                  [NEW] orchestrator: ticks conveyor + magnet, owns Garage, integrates with Zone1Manager
+│       ├── Project.Zone1.Trucks.asmdef           [NEW]
+│       ├── TruckState.cs                          [NEW]
+│       ├── Truck.cs                               [NEW]
+│       ├── ConveyorWaypoint.cs                    [NEW]
+│       ├── ConveyorTrack.cs                       [NEW]
+│       ├── WallSlot.cs                            [NEW]
+│       ├── MagnetSystem.cs                        [NEW]
+│       ├── Garage.cs                              [NEW]
+│       ├── TruckView.cs                           [NEW]
+│       ├── ConveyorView.cs                        [NEW]
+│       ├── GarageView.cs                          [NEW]
+│       └── Zone1TrucksManager.cs                  [NEW]
 └── Tests/EditMode/
-    ├── TruckStateMachineTests.cs                  [NEW]
     ├── ConveyorTrackTests.cs                      [NEW]
     ├── MagnetSystemTests.cs                       [NEW]
     └── GarageTests.cs                             [NEW]
 
-Assets/_Project/Tests/EditMode/Project.Tests.EditMode.asmdef    [MODIFY] add "Project.Zone1.Trucks" reference
+Assets/_Project/Scripts/Zone1_FruitWall/Zone1Manager.cs   [MODIFY] add public Grid getter
+Assets/_Project/Tests/EditMode/Project.Tests.EditMode.asmdef  [MODIFY] add Project.Zone1.Trucks ref
 
 Assets/_Project/Scenes/Main.unity                  [MODIFY] add Zone1.Trucks GameObjects
-Assets/_Project/Settings/GameBalance.asset         [no changes needed; existing TruckCapacity, ConveyorSlotCount, MagnetRateHz used]
+Assets/_Project/Prefabs/TruckPrefab.prefab         [NEW]
 ```
 
 ---
 
 ## Task 0: Branch + asmdef setup
 
-- [ ] **Step 1: Create feature branch from current main (after step2 merged)**
+- [ ] **Step 1: Create feature branch from main**
 
 ```bash
 cd "/Users/jakubwolsza/Documents/Fruits&Juices"
 git checkout main
-git merge --no-ff feat/mvp-step2 -m "merge: feat/mvp-step2 (MVP Step 2: Fruit Wall sand-physics + manual refill)"
+git merge --no-ff feat/mvp-step2 -m "merge: feat/mvp-step2 (MVP Step 2)"
 git checkout -b feat/mvp-step3
 ```
 
@@ -61,17 +85,12 @@ git checkout -b feat/mvp-step3
 mkdir -p "/Users/jakubwolsza/Documents/Fruits&Juices/Assets/_Project/Scripts/Zone1_Trucks"
 ```
 
-`Assets/_Project/Scripts/Zone1_Trucks/Project.Zone1.Trucks.asmdef`:
-
+`Project.Zone1.Trucks.asmdef`:
 ```json
 {
     "name": "Project.Zone1.Trucks",
     "rootNamespace": "Project.Zone1.Trucks",
-    "references": [
-        "Project.Core",
-        "Project.Data",
-        "Project.Zone1.FruitWall"
-    ],
+    "references": ["Project.Core", "Project.Data", "Project.Zone1.FruitWall"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -84,9 +103,7 @@ mkdir -p "/Users/jakubwolsza/Documents/Fruits&Juices/Assets/_Project/Scripts/Zon
 }
 ```
 
-- [ ] **Step 3: Update test asmdef references**
-
-W `Assets/_Project/Tests/EditMode/Project.Tests.EditMode.asmdef` dodaj `"Project.Zone1.Trucks"` do `references`.
+- [ ] **Step 3: Update test asmdef** — dodaj `"Project.Zone1.Trucks"` do `Project.Tests.EditMode.asmdef.references`.
 
 - [ ] **Step 4: Commit**
 
@@ -97,15 +114,12 @@ git commit -m "chore: scaffold Project.Zone1.Trucks asmdef"
 
 ---
 
-## Task 1: `TruckState` enum + `Truck` data class
+## Task 1: TruckState + Truck
 
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/TruckState.cs`
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/Truck.cs`
-
-- [ ] **Step 1: `TruckState.cs`**
+**Files:** `TruckState.cs`, `Truck.cs`
 
 ```csharp
+// TruckState.cs
 namespace Project.Zone1.Trucks
 {
     public enum TruckState
@@ -120,9 +134,8 @@ namespace Project.Zone1.Trucks
 }
 ```
 
-- [ ] **Step 2: `Truck.cs`**
-
 ```csharp
+// Truck.cs
 using Project.Core;
 
 namespace Project.Zone1.Trucks
@@ -134,8 +147,6 @@ namespace Project.Zone1.Trucks
         public int Capacity { get; private set; }
         public int Load { get; private set; }
         public TruckState State { get; set; } = TruckState.InGarage;
-
-        // Position along the conveyor track parameterized as [0..1] (loop). Owned by ConveyorTrack.
         public float TrackPosition { get; set; }
 
         public bool IsFull => Load >= Capacity;
@@ -145,41 +156,24 @@ namespace Project.Zone1.Trucks
             Id = id;
             FruitColor = color;
             Capacity = capacity;
-            Load = 0;
         }
 
         public void AddFruit() { if (Load < Capacity) Load++; }
         public void EmptyLoad() { Load = 0; }
-        public void SetCapacity(int newCapacity) { Capacity = newCapacity; }
     }
 }
 ```
 
-Brak testów dla samego `Truck` (trivial getters/setters). Testy w state machine i magnet system go pokryją.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/TruckState.cs Assets/_Project/Scripts/Zone1_Trucks/Truck.cs
-git commit -m "feat(zone1): add TruckState enum and Truck data class"
-```
+- [ ] **Commit:** `feat(zone1): add TruckState enum and Truck data class`
 
 ---
 
-## Task 2: `ConveyorWaypoint` + `ConveyorTrack` (TDD)
+## Task 2: ConveyorWaypoint + ConveyorTrack (TDD)
 
-`ConveyorTrack` przechowuje listę waypointów i porusza ciężarówkami w formacji. Każda ciężarówka ma `TrackPosition ∈ [0..1)`. Track ma metodę `Tick(deltaTime, baseSpeed)` która przesuwa wszystkie ciężarówki o `baseSpeed * deltaTime / TrackLength`. Ale jeśli któraś ciężarówka jest w stanie `StoppedAtSlot`, to wszystkie ZA NIĄ (idące do tej ciężarówki) zatrzymują się. Ciężarówki PRZED nią (po active slot 3) jadą dalej.
-
-Dla MVP: prosta lista waypointów `Vector3[]` ułożonych w pętlę. `GetWorldPositionAtTrackParam(float t)` interpoluje liniowo między waypointami.
-
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/ConveyorWaypoint.cs`
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/ConveyorTrack.cs`
-- Create: `Assets/_Project/Tests/EditMode/ConveyorTrackTests.cs`
-
-- [ ] **Step 1: `ConveyorWaypoint.cs`**
+**Files:** `ConveyorWaypoint.cs`, `ConveyorTrack.cs`, `ConveyorTrackTests.cs`
 
 ```csharp
+// ConveyorWaypoint.cs
 using UnityEngine;
 
 namespace Project.Zone1.Trucks
@@ -188,113 +182,74 @@ namespace Project.Zone1.Trucks
     public struct ConveyorWaypoint
     {
         public Vector3 Position;
-        public bool IsActiveSlot;     // true for the 3 slots under the wall
-        public int SlotIndex;         // -1 for non-slot waypoints, 0/1/2 for slots
+        public bool IsActiveSlot;
+        public int SlotIndex;
     }
 }
 ```
 
-- [ ] **Step 2: Tests `ConveyorTrackTests.cs`**
+Tests (skrócona wersja — pełne testy w pliku):
 
 ```csharp
+// ConveyorTrackTests.cs
 using NUnit.Framework;
 using UnityEngine;
-using Project.Zone1.Trucks;
 using Project.Core;
+using Project.Zone1.Trucks;
 using System.Collections.Generic;
 
 namespace Project.Tests.EditMode
 {
     public class ConveyorTrackTests
     {
-        ConveyorTrack BuildSimpleSquareTrack()
+        ConveyorTrack BuildSquare()
         {
-            var waypoints = new List<ConveyorWaypoint>
+            return new ConveyorTrack(new List<ConveyorWaypoint>
             {
-                new() { Position = new Vector3(0, 0, 0), IsActiveSlot = false, SlotIndex = -1 },
-                new() { Position = new Vector3(10, 0, 0), IsActiveSlot = false, SlotIndex = -1 },
-                new() { Position = new Vector3(10, 0, 10), IsActiveSlot = false, SlotIndex = -1 },
-                new() { Position = new Vector3(0, 0, 10), IsActiveSlot = false, SlotIndex = -1 },
-            };
-            return new ConveyorTrack(waypoints);
+                new() { Position = new Vector3(0, 0, 0) },
+                new() { Position = new Vector3(10, 0, 0) },
+                new() { Position = new Vector3(10, 0, 10) },
+                new() { Position = new Vector3(0, 0, 10) },
+            });
         }
 
-        [Test]
-        public void GetWorldPositionAtTrackParam_AtZero_ReturnsFirstWaypoint()
+        [Test] public void GetWorldPositionAtTrackParam_AtZero_ReturnsFirstWaypoint()
+        { var t = BuildSquare(); Assert.That(t.GetWorldPositionAtTrackParam(0f), Is.EqualTo(new Vector3(0,0,0))); }
+
+        [Test] public void GetWorldPositionAtTrackParam_AtQuarter_OnFirstSegment()
+        { var t = BuildSquare(); var p = t.GetWorldPositionAtTrackParam(0.25f);
+          Assert.That(p.x, Is.EqualTo(10f).Within(0.001f)); Assert.That(p.z, Is.EqualTo(0f).Within(0.001f)); }
+
+        [Test] public void GetWorldPositionAtTrackParam_LoopsAtOne()
+        { var t = BuildSquare(); Assert.That(t.GetWorldPositionAtTrackParam(1f), Is.EqualTo(t.GetWorldPositionAtTrackParam(0f))); }
+
+        [Test] public void Tick_AdvancesAllTrucks_WhenNoneStopped()
         {
-            var t = BuildSimpleSquareTrack();
-            var pos = t.GetWorldPositionAtTrackParam(0f);
-            Assert.That(pos, Is.EqualTo(new Vector3(0, 0, 0)));
+            var track = BuildSquare();
+            var t1 = new Truck(1, FruitType.Apple, 100) { TrackPosition = 0f, State = TruckState.OnConveyor };
+            var t2 = new Truck(2, FruitType.Orange, 100) { TrackPosition = 0.25f, State = TruckState.OnConveyor };
+            track.Tick(new[] { t1, t2 }, 1f, 4f); // total length 40, advance 4 → +0.1
+            Assert.That(t1.TrackPosition, Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(t2.TrackPosition, Is.EqualTo(0.35f).Within(0.001f));
         }
 
-        [Test]
-        public void GetWorldPositionAtTrackParam_AtQuarter_OnFirstSegment()
+        [Test] public void Tick_TruckStoppedAtSlot_TrucksBehindFreeze()
         {
-            // Total length = 4 * 10 = 40. Quarter = position 10 along path = (10,0,0) — second waypoint.
-            var t = BuildSimpleSquareTrack();
-            var pos = t.GetWorldPositionAtTrackParam(0.25f);
-            Assert.That(pos.x, Is.EqualTo(10f).Within(0.001f));
-            Assert.That(pos.z, Is.EqualTo(0f).Within(0.001f));
-        }
-
-        [Test]
-        public void GetWorldPositionAtTrackParam_LoopsAtOne()
-        {
-            var t = BuildSimpleSquareTrack();
-            var posZero = t.GetWorldPositionAtTrackParam(0f);
-            var posOne = t.GetWorldPositionAtTrackParam(1f);
-            Assert.That(posOne, Is.EqualTo(posZero));
-        }
-
-        [Test]
-        public void Tick_AdvancesAllTrucks_WhenNoneStopped()
-        {
-            var track = BuildSimpleSquareTrack();
-            var truck1 = new Truck(1, FruitType.Apple, 100);
-            truck1.TrackPosition = 0f;
-            truck1.State = TruckState.OnConveyor;
-
-            var truck2 = new Truck(2, FruitType.Orange, 100);
-            truck2.TrackPosition = 0.25f;
-            truck2.State = TruckState.OnConveyor;
-
-            track.Tick(new[] { truck1, truck2 }, deltaTime: 1f, speedUnitsPerSec: 4f); // advance 4 units, total length 40 → 0.1
-
-            Assert.That(truck1.TrackPosition, Is.EqualTo(0.1f).Within(0.001f));
-            Assert.That(truck2.TrackPosition, Is.EqualTo(0.35f).Within(0.001f));
-        }
-
-        [Test]
-        public void Tick_TruckStoppedAtSlot_TrucksBehindFreeze()
-        {
-            // Stopped truck at TrackPosition=0.5; truck behind at 0.4 should NOT advance past 0.5 (formation).
-            // Trucks ahead (>0.5) advance.
-            var track = BuildSimpleSquareTrack();
-            var stopped = new Truck(1, FruitType.Apple, 100);
-            stopped.TrackPosition = 0.5f;
-            stopped.State = TruckState.StoppedAtSlot;
-
-            var behind = new Truck(2, FruitType.Apple, 100);
-            behind.TrackPosition = 0.45f;
-            behind.State = TruckState.OnConveyor;
-
-            var ahead = new Truck(3, FruitType.Apple, 100);
-            ahead.TrackPosition = 0.6f;
-            ahead.State = TruckState.OnConveyor;
-
-            track.Tick(new[] { stopped, behind, ahead }, deltaTime: 1f, speedUnitsPerSec: 4f);
-
-            Assert.That(stopped.TrackPosition, Is.EqualTo(0.5f).Within(0.001f), "stopped stays");
-            Assert.That(behind.TrackPosition, Is.LessThanOrEqualTo(0.5f), "behind cannot pass stopped");
-            Assert.That(ahead.TrackPosition, Is.EqualTo(0.7f).Within(0.001f), "ahead advances normally");
+            var track = BuildSquare();
+            var stopped = new Truck(1, FruitType.Apple, 100) { TrackPosition = 0.5f, State = TruckState.StoppedAtSlot };
+            var behind = new Truck(2, FruitType.Apple, 100) { TrackPosition = 0.45f, State = TruckState.OnConveyor };
+            var ahead = new Truck(3, FruitType.Apple, 100) { TrackPosition = 0.6f, State = TruckState.OnConveyor };
+            track.Tick(new[] { stopped, behind, ahead }, 1f, 4f);
+            Assert.That(stopped.TrackPosition, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(behind.TrackPosition, Is.LessThanOrEqualTo(0.5f));
+            Assert.That(ahead.TrackPosition, Is.EqualTo(0.7f).Within(0.001f));
         }
     }
 }
 ```
 
-- [ ] **Step 3: Implementuj `ConveyorTrack.cs`**
-
 ```csharp
+// ConveyorTrack.cs
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -328,7 +283,7 @@ namespace Project.Zone1.Trucks
         public Vector3 GetWorldPositionAtTrackParam(float t)
         {
             if (totalLength <= 0f) return waypoints.Count > 0 ? waypoints[0].Position : Vector3.zero;
-            t = ((t % 1f) + 1f) % 1f; // wrap [0..1)
+            t = ((t % 1f) + 1f) % 1f;
             float distance = t * totalLength;
             for (int i = 0; i < segmentLengths.Length; i++)
             {
@@ -343,47 +298,31 @@ namespace Project.Zone1.Trucks
             return waypoints[0].Position;
         }
 
-        /// <summary>
-        /// Advance all trucks. A truck in StoppedAtSlot state holds its position;
-        /// trucks immediately behind it (within "formation") freeze at the stopped truck's position.
-        /// Trucks ahead of the stopped one advance freely.
-        /// </summary>
         public void Tick(IReadOnlyList<Truck> trucks, float deltaTime, float speedUnitsPerSec)
         {
             if (trucks.Count == 0 || totalLength <= 0f) return;
-
             float deltaParam = (speedUnitsPerSec * deltaTime) / totalLength;
 
-            // Collect TrackPositions of stopped trucks for formation check.
             var stoppedPositions = new List<float>();
             foreach (var t in trucks)
-                if (t.State == TruckState.StoppedAtSlot)
-                    stoppedPositions.Add(t.TrackPosition);
+                if (t.State == TruckState.StoppedAtSlot) stoppedPositions.Add(t.TrackPosition);
 
             foreach (var truck in trucks)
             {
                 if (truck.State == TruckState.StoppedAtSlot) continue;
                 if (truck.State == TruckState.InGarage) continue;
                 if (truck.State == TruckState.ReturningToGarage) continue;
-                // OnConveyor / EnteringConveyor / Full: advance, but check formation against stopped trucks ahead.
 
                 float current = truck.TrackPosition;
                 float desired = current + deltaParam;
-
-                // Find nearest stopped truck ahead (mod 1).
                 float minBlocker = float.PositiveInfinity;
                 foreach (float sp in stoppedPositions)
                 {
                     float distAhead = (sp - current + 1f) % 1f;
-                    if (distAhead > 0f && distAhead < minBlocker)
-                        minBlocker = distAhead;
+                    if (distAhead > 0f && distAhead < minBlocker) minBlocker = distAhead;
                 }
-
                 if (minBlocker < float.PositiveInfinity && deltaParam >= minBlocker)
-                {
-                    // Clamp behind the blocker (small epsilon to avoid overlap).
                     desired = current + minBlocker - 0.001f;
-                }
 
                 truck.TrackPosition = ((desired % 1f) + 1f) % 1f;
             }
@@ -392,29 +331,18 @@ namespace Project.Zone1.Trucks
 }
 ```
 
-- [ ] **Step 4: Run tests → all pass**
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/ConveyorWaypoint.cs Assets/_Project/Scripts/Zone1_Trucks/ConveyorTrack.cs Assets/_Project/Tests/EditMode/ConveyorTrackTests.cs
-git commit -m "feat(zone1): add ConveyorTrack with waypoint loop and formation logic + tests"
-```
+- [ ] **Run tests → all pass; Commit:** `feat(zone1): add ConveyorTrack with formation logic + tests`
 
 ---
 
-## Task 3: `WallSlot` + `MagnetSystem` (TDD)
+## Task 3: WallSlot + MagnetSystem (TDD)
 
-3 sloty parallel — każdy jest "active spot" w którym ciężarówka się zatrzymuje (slot 3 = ostatni, ten powoduje pause). Slot ma pozycję world i `slotIndex`. `MagnetSystem` co tick: dla każdej ciężarówki w slocie znajduje najbliższy pasujący kolor w bottom row gridu, usuwa z gridu, dodaje load do ciężarówki, emituje event animacji.
+`MagnetSystem` operuje na cellach gridu (X-only proximity dla osi-aligned wall). Caller dostarcza wallLeftX i wallWidth **w world units** (już po skali).
 
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/WallSlot.cs`
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/MagnetSystem.cs`
-- Create: `Assets/_Project/Tests/EditMode/MagnetSystemTests.cs`
-
-- [ ] **Step 1: `WallSlot.cs`**
+**Files:** `WallSlot.cs`, `MagnetSystem.cs`, `MagnetSystemTests.cs`
 
 ```csharp
+// WallSlot.cs
 using UnityEngine;
 
 namespace Project.Zone1.Trucks
@@ -422,16 +350,15 @@ namespace Project.Zone1.Trucks
     [System.Serializable]
     public struct WallSlot
     {
-        public Vector3 WorldPosition;
-        public int SlotIndex;        // 0..2
-        public bool IsStopSlot;      // true for the last slot (slot 2 by default) where trucks pause
+        public Vector3 WorldPosition;     // gdzie truck stoi w slocie (Y=0 ground level)
+        public int SlotIndex;             // 0..2
+        public bool IsStopSlot;           // true tylko dla ostatniego (slot 2 by default)
     }
 }
 ```
 
-- [ ] **Step 2: Tests `MagnetSystemTests.cs`**
-
 ```csharp
+// MagnetSystemTests.cs
 using NUnit.Framework;
 using UnityEngine;
 using Project.Core;
@@ -447,19 +374,14 @@ namespace Project.Tests.EditMode
         {
             var grid = new FruitGrid(10, 10);
             grid.SetCell(5, 0, FruitType.Apple);
-
-            var truck = new Truck(1, FruitType.Apple, 100);
-            truck.State = TruckState.StoppedAtSlot;
+            var truck = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
 
             var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid,
-                trucksAtSlots: new[] { (truck, slotWorldX: 0f) },
-                wallLeftX: 0f,
-                wallWidth: 10f);
+                grid, new[] { (truck, 0f) }, wallLeftXWorld: 0f, wallWidthWorld: 10f);
 
             Assert.AreEqual(1, assignments.Count);
             Assert.AreEqual(1, truck.Load);
-            Assert.IsNull(grid.GetCell(5, 0), "fruit removed from grid");
+            Assert.IsNull(grid.GetCell(5, 0));
         }
 
         [Test]
@@ -467,19 +389,11 @@ namespace Project.Tests.EditMode
         {
             var grid = new FruitGrid(10, 10);
             grid.SetCell(5, 0, FruitType.Orange);
-
-            var truck = new Truck(1, FruitType.Apple, 100);
-            truck.State = TruckState.StoppedAtSlot;
-
+            var truck = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
             var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid,
-                trucksAtSlots: new[] { (truck, slotWorldX: 0f) },
-                wallLeftX: 0f,
-                wallWidth: 10f);
-
+                grid, new[] { (truck, 0f) }, 0f, 10f);
             Assert.AreEqual(0, assignments.Count);
             Assert.AreEqual(0, truck.Load);
-            Assert.AreEqual(FruitType.Orange, grid.GetCell(5, 0), "fruit still in grid");
         }
 
         [Test]
@@ -487,19 +401,11 @@ namespace Project.Tests.EditMode
         {
             var grid = new FruitGrid(10, 10);
             grid.SetCell(5, 0, FruitType.Apple);
-
-            var truck = new Truck(1, FruitType.Apple, 1);
-            truck.AddFruit(); // already at capacity 1
-            truck.State = TruckState.StoppedAtSlot;
-
+            var truck = new Truck(1, FruitType.Apple, 1) { State = TruckState.StoppedAtSlot };
+            truck.AddFruit();
             var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid,
-                trucksAtSlots: new[] { (truck, slotWorldX: 0f) },
-                wallLeftX: 0f,
-                wallWidth: 10f);
-
+                grid, new[] { (truck, 0f) }, 0f, 10f);
             Assert.AreEqual(0, assignments.Count);
-            Assert.IsNotNull(grid.GetCell(5, 0));
         }
 
         [Test]
@@ -508,25 +414,13 @@ namespace Project.Tests.EditMode
             var grid = new FruitGrid(10, 10);
             grid.SetCell(2, 0, FruitType.Apple);
             grid.SetCell(8, 0, FruitType.Apple);
-
-            var truckLeft = new Truck(1, FruitType.Apple, 100);
-            truckLeft.State = TruckState.StoppedAtSlot;
-            var truckRight = new Truck(2, FruitType.Apple, 100);
-            truckRight.State = TruckState.StoppedAtSlot;
-
-            // wallLeftX=0, wallWidth=10 → cell x=2 at worldX=2.5 (cell center), cell x=8 at worldX=8.5.
-            // truckLeft at slotWorldX=2 → closest fruit is x=2 (worldX 2.5). truckRight at slotWorldX=8 → x=8.
+            var truckLeft = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
+            var truckRight = new Truck(2, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
             var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid,
-                trucksAtSlots: new[] { (truckLeft, 2f), (truckRight, 8f) },
-                wallLeftX: 0f,
-                wallWidth: 10f);
-
+                grid, new[] { (truckLeft, 2f), (truckRight, 8f) }, 0f, 10f);
             Assert.AreEqual(2, assignments.Count);
             Assert.AreEqual(1, truckLeft.Load);
             Assert.AreEqual(1, truckRight.Load);
-            Assert.IsTrue(grid.IsCellEmpty(2, 0));
-            Assert.IsTrue(grid.IsCellEmpty(8, 0));
         }
 
         [Test]
@@ -535,31 +429,20 @@ namespace Project.Tests.EditMode
             var grid = new FruitGrid(10, 10);
             grid.SetCell(4, 0, FruitType.Apple);
             grid.SetCell(6, 0, FruitType.Apple);
-
-            var truckA = new Truck(1, FruitType.Apple, 100);
-            truckA.State = TruckState.StoppedAtSlot;
-            var truckB = new Truck(2, FruitType.Apple, 100);
-            truckB.State = TruckState.StoppedAtSlot;
-
-            // Both trucks same color, both at the same slot worldX.
-            // First truck takes nearest, second takes next-nearest.
+            var a = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
+            var b = new Truck(2, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
             var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid,
-                trucksAtSlots: new[] { (truckA, 5f), (truckB, 5f) },
-                wallLeftX: 0f,
-                wallWidth: 10f);
-
+                grid, new[] { (a, 5f), (b, 5f) }, 0f, 10f);
             Assert.AreEqual(2, assignments.Count);
-            Assert.AreEqual(1, truckA.Load);
-            Assert.AreEqual(1, truckB.Load);
+            Assert.AreEqual(1, a.Load);
+            Assert.AreEqual(1, b.Load);
         }
     }
 }
 ```
 
-- [ ] **Step 3: Implementuj `MagnetSystem.cs`**
-
 ```csharp
+// MagnetSystem.cs
 using System.Collections.Generic;
 using UnityEngine;
 using Project.Core;
@@ -572,37 +455,35 @@ namespace Project.Zone1.Trucks
         public Truck Truck;
         public Vector2Int GridCellRemoved;
         public FruitType FruitType;
-        public Vector3 FruitWorldPosition;
     }
 
     public static class MagnetSystem
     {
         /// <summary>
-        /// For each truck at a slot, find the nearest matching-color fruit in the bottom row of the grid
-        /// (by world X distance). Assign 1 fruit per call per truck, remove it from grid, increment truck Load.
-        /// Returns list of assignments (for view-side animation triggering).
+        /// X-only proximity matching. Caller dostarcza wallLeftXWorld (left edge in world)
+        /// and wallWidthWorld (total width in world AFTER any parent scale).
+        /// For each truck at a slot, find nearest matching-color fruit in bottom row by world X distance.
         /// </summary>
         public static List<MagnetAssignment> AssignFruitsToTrucksAtSlots(
             FruitGrid grid,
             IReadOnlyList<(Truck truck, float slotWorldX)> trucksAtSlots,
-            float wallLeftX,
-            float wallWidth)
+            float wallLeftXWorld,
+            float wallWidthWorld)
         {
             var result = new List<MagnetAssignment>();
             if (grid == null || trucksAtSlots == null || trucksAtSlots.Count == 0) return result;
             if (grid.Columns <= 0) return result;
 
-            float cellWidth = wallWidth / grid.Columns;
+            float cellWidthWorld = wallWidthWorld / grid.Columns;
 
-            // Build mutable list of available bottom-row fruits (cellX → FruitType).
             var available = new List<(int cellX, FruitType type)>();
             for (int x = 0; x < grid.Columns; x++)
             {
-                var cell = grid.GetCell(x, 0);
-                if (cell.HasValue) available.Add((x, cell.Value));
+                var c = grid.GetCell(x, 0);
+                if (c.HasValue) available.Add((x, c.Value));
             }
 
-            foreach (var (truck, slotWorldX) in trucksAtSlots)
+            foreach (var (truck, slotX) in trucksAtSlots)
             {
                 if (truck.IsFull) continue;
 
@@ -612,13 +493,9 @@ namespace Project.Zone1.Trucks
                 {
                     var (cellX, type) = available[i];
                     if (type != truck.FruitColor) continue;
-                    float worldX = wallLeftX + cellX * cellWidth + cellWidth * 0.5f;
-                    float dist = Mathf.Abs(worldX - slotWorldX);
-                    if (dist < bestDist)
-                    {
-                        bestDist = dist;
-                        bestIdx = i;
-                    }
+                    float worldX = wallLeftXWorld + cellX * cellWidthWorld + cellWidthWorld * 0.5f;
+                    float d = Mathf.Abs(worldX - slotX);
+                    if (d < bestDist) { bestDist = d; bestIdx = i; }
                 }
 
                 if (bestIdx >= 0)
@@ -627,48 +504,25 @@ namespace Project.Zone1.Trucks
                     grid.ClearCell(cellX, 0);
                     truck.AddFruit();
                     available.RemoveAt(bestIdx);
-
-                    result.Add(new MagnetAssignment
-                    {
-                        Truck = truck,
-                        GridCellRemoved = new Vector2Int(cellX, 0),
-                        FruitType = type,
-                        FruitWorldPosition = new Vector3(
-                            wallLeftX + cellX * cellWidth + cellWidth * 0.5f,
-                            0f, // caller fills in actual Y from wallBottomY
-                            0f),
-                    });
+                    result.Add(new MagnetAssignment { Truck = truck, GridCellRemoved = new Vector2Int(cellX, 0), FruitType = type });
                 }
             }
-
             return result;
         }
     }
 }
 ```
 
-- [ ] **Step 4: Run tests → all pass**
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/WallSlot.cs Assets/_Project/Scripts/Zone1_Trucks/MagnetSystem.cs Assets/_Project/Tests/EditMode/MagnetSystemTests.cs
-git commit -m "feat(zone1): add WallSlot and MagnetSystem with closest-X assignment + tests"
-```
+- [ ] **Run tests → pass; Commit:** `feat(zone1): add WallSlot and MagnetSystem with X-proximity assignment + tests`
 
 ---
 
-## Task 4: `Garage` (TDD)
+## Task 4: Garage (TDD)
 
-Trzyma listę ciężarówek (per kolor — 1 startowa per kolor). Ma metodę `Dispatch(int truckId)` która próbuje wpuścić ciężarówkę na conveyor (jeśli wolne miejsce na torze). Limit ciężarówek na conveyorze = `ConveyorSlotCount` z `GameBalanceSO`.
-
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/Garage.cs`
-- Create: `Assets/_Project/Tests/EditMode/GarageTests.cs`
-
-- [ ] **Step 1: Tests**
+**Files:** `Garage.cs`, `GarageTests.cs`
 
 ```csharp
+// GarageTests.cs
 using NUnit.Framework;
 using Project.Core;
 using Project.Zone1.Trucks;
@@ -677,85 +531,64 @@ namespace Project.Tests.EditMode
 {
     public class GarageTests
     {
-        [Test]
-        public void NewGarage_WithStarterTrucks_AllInGarageState()
+        [Test] public void NewGarage_StarterTrucks_AllInGarageState()
         {
-            var garage = new Garage(maxOnConveyor: 4);
-            var t1 = new Truck(1, FruitType.Apple, 100);
-            var t2 = new Truck(2, FruitType.Orange, 100);
-            garage.AddStarterTruck(t1);
-            garage.AddStarterTruck(t2);
-
-            Assert.AreEqual(2, garage.TruckCount);
-            Assert.AreEqual(0, garage.OnConveyorCount);
-            Assert.AreEqual(TruckState.InGarage, t1.State);
-            Assert.AreEqual(TruckState.InGarage, t2.State);
+            var g = new Garage(maxOnConveyor: 4);
+            var t = new Truck(1, FruitType.Apple, 100);
+            g.AddStarterTruck(t);
+            Assert.AreEqual(1, g.TruckCount);
+            Assert.AreEqual(0, g.OnConveyorCount);
+            Assert.AreEqual(TruckState.InGarage, t.State);
         }
 
-        [Test]
-        public void Dispatch_FromGarage_ChangesStateToEnteringConveyor()
+        [Test] public void Dispatch_FromGarage_EnteringConveyor()
         {
-            var garage = new Garage(maxOnConveyor: 4);
+            var g = new Garage(4);
             var t = new Truck(1, FruitType.Apple, 100);
-            garage.AddStarterTruck(t);
-
-            bool ok = garage.Dispatch(1);
-
-            Assert.IsTrue(ok);
+            g.AddStarterTruck(t);
+            Assert.IsTrue(g.Dispatch(1));
             Assert.AreEqual(TruckState.EnteringConveyor, t.State);
             Assert.AreEqual(0f, t.TrackPosition);
-            Assert.AreEqual(1, garage.OnConveyorCount);
         }
 
-        [Test]
-        public void Dispatch_ConveyorFull_ReturnsFalse()
+        [Test] public void Dispatch_ConveyorFull_ReturnsFalse()
         {
-            var garage = new Garage(maxOnConveyor: 1);
+            var g = new Garage(1);
             var t1 = new Truck(1, FruitType.Apple, 100);
             var t2 = new Truck(2, FruitType.Apple, 100);
-            garage.AddStarterTruck(t1);
-            garage.AddStarterTruck(t2);
-
-            Assert.IsTrue(garage.Dispatch(1));
-            Assert.IsFalse(garage.Dispatch(2), "conveyor full");
-            Assert.AreEqual(TruckState.InGarage, t2.State);
+            g.AddStarterTruck(t1); g.AddStarterTruck(t2);
+            Assert.IsTrue(g.Dispatch(1));
+            Assert.IsFalse(g.Dispatch(2));
         }
 
-        [Test]
-        public void Dispatch_TruckNotInGarage_ReturnsFalse()
+        [Test] public void Dispatch_AlreadyOnConveyor_ReturnsFalse()
         {
-            var garage = new Garage(maxOnConveyor: 4);
+            var g = new Garage(4);
             var t = new Truck(1, FruitType.Apple, 100);
-            garage.AddStarterTruck(t);
-
-            Assert.IsTrue(garage.Dispatch(1));
-            Assert.IsFalse(garage.Dispatch(1), "already on conveyor");
+            g.AddStarterTruck(t);
+            g.Dispatch(1);
+            Assert.IsFalse(g.Dispatch(1));
         }
 
-        [Test]
-        public void ReturnToGarage_RestoresState()
+        [Test] public void ReturnToGarage_RestoresStateAndEmpties()
         {
-            var garage = new Garage(maxOnConveyor: 4);
+            var g = new Garage(4);
             var t = new Truck(1, FruitType.Apple, 100);
-            garage.AddStarterTruck(t);
-
-            garage.Dispatch(1);
+            g.AddStarterTruck(t);
+            g.Dispatch(1);
             t.AddFruit();
             t.State = TruckState.ReturningToGarage;
-
-            garage.ReturnToGarage(1);
-
+            g.ReturnToGarage(1);
             Assert.AreEqual(TruckState.InGarage, t.State);
             Assert.AreEqual(0, t.Load);
-            Assert.AreEqual(0, garage.OnConveyorCount);
+            Assert.AreEqual(0, g.OnConveyorCount);
         }
     }
 }
 ```
 
-- [ ] **Step 2: Implementuj `Garage.cs`**
-
 ```csharp
+// Garage.cs
 using System.Collections.Generic;
 
 namespace Project.Zone1.Trucks
@@ -765,15 +598,11 @@ namespace Project.Zone1.Trucks
         readonly Dictionary<int, Truck> trucksById = new();
         readonly HashSet<int> onConveyorIds = new();
         public int MaxOnConveyor { get; }
-
         public int TruckCount => trucksById.Count;
         public int OnConveyorCount => onConveyorIds.Count;
         public IReadOnlyDictionary<int, Truck> TrucksById => trucksById;
 
-        public Garage(int maxOnConveyor)
-        {
-            MaxOnConveyor = maxOnConveyor;
-        }
+        public Garage(int maxOnConveyor) { MaxOnConveyor = maxOnConveyor; }
 
         public void AddStarterTruck(Truck truck)
         {
@@ -786,7 +615,6 @@ namespace Project.Zone1.Trucks
             if (!trucksById.TryGetValue(truckId, out var truck)) return false;
             if (truck.State != TruckState.InGarage) return false;
             if (onConveyorIds.Count >= MaxOnConveyor) return false;
-
             truck.State = TruckState.EnteringConveyor;
             truck.TrackPosition = 0f;
             onConveyorIds.Add(truckId);
@@ -804,32 +632,14 @@ namespace Project.Zone1.Trucks
 }
 ```
 
-- [ ] **Step 3: Run tests → pass**
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/Garage.cs Assets/_Project/Tests/EditMode/GarageTests.cs
-git commit -m "feat(zone1): add Garage with dispatch and return-to-garage logic + tests"
-```
+- [ ] **Run tests → pass; Commit:** `feat(zone1): add Garage with dispatch and return-to-garage logic + tests`
 
 ---
 
-## Task 5: `TruckView` (3D ProBuilder model + position sync)
-
-MonoBehaviour. Ma referencję do `Truck` (data). Co frame: ustawia transform.position na `track.GetWorldPositionAtTrackParam(truck.TrackPosition)` lub na garage parking position. Również orientuje się tangencjalnie wzdłuż toru (forward = pochodna pozycji wzdłuż t).
-
-Wizualizacja: child GameObjects z ProBuilder cubes:
-- `Cab` (mała kostka 0.5×0.5×0.5)
-- `Box` (większa kostka 1.5×0.8×1.0 z materiałem koloru `FruitType`)
-- 4 `Wheels` (spłaszczone walce 0.3×0.1×0.3)
-
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/TruckView.cs`
-
-- [ ] **Step 1: `TruckView.cs`**
+## Task 5: TruckView
 
 ```csharp
+// TruckView.cs
 using UnityEngine;
 using Project.Zone1.FruitWall;
 
@@ -837,7 +647,7 @@ namespace Project.Zone1.Trucks
 {
     public class TruckView : MonoBehaviour
     {
-        [SerializeField] Renderer boxRenderer; // assign in inspector — paka do colorowania
+        [SerializeField] Renderer boxRenderer;
 
         Truck truck;
         ConveyorTrack track;
@@ -850,8 +660,9 @@ namespace Project.Zone1.Trucks
             this.track = track;
             this.garageParkPosition = garageParkPosition;
             ApplyColor();
-            UpdateTransform();
         }
+
+        public void SetGaragePosition(Vector3 pos) => garageParkPosition = pos;
 
         void ApplyColor()
         {
@@ -864,62 +675,40 @@ namespace Project.Zone1.Trucks
             boxMaterial.color = FruitColorPalette.GetColor(truck.FruitColor);
         }
 
-        public void UpdateTransform()
+        void LateUpdate()
         {
             if (truck == null) return;
-
             switch (truck.State)
             {
                 case TruckState.InGarage:
-                    transform.position = garageParkPosition;
-                    break;
                 case TruckState.ReturningToGarage:
-                    // Lerp toward garage; for MVP — instant teleport in Tick() of Zone1TrucksManager
                     transform.position = garageParkPosition;
+                    transform.rotation = Quaternion.identity;
                     break;
                 default:
                     if (track != null)
                     {
                         transform.position = track.GetWorldPositionAtTrackParam(truck.TrackPosition);
-                        // Tangent for orientation
-                        float dt = 0.001f;
-                        Vector3 ahead = track.GetWorldPositionAtTrackParam(
-                            (truck.TrackPosition + dt) % 1f);
-                        Vector3 forward = (ahead - transform.position).normalized;
-                        if (forward != Vector3.zero)
-                            transform.rotation = Quaternion.LookRotation(forward, Vector3.up);
+                        Vector3 ahead = track.GetWorldPositionAtTrackParam((truck.TrackPosition + 0.001f) % 1f);
+                        Vector3 fwd = (ahead - transform.position).normalized;
+                        if (fwd.sqrMagnitude > 0.0001f)
+                            transform.rotation = Quaternion.LookRotation(fwd, Vector3.up);
                     }
                     break;
             }
-        }
-
-        void LateUpdate()
-        {
-            UpdateTransform();
         }
     }
 }
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/TruckView.cs
-git commit -m "feat(zone1): add TruckView 3D MonoBehaviour with track-position sync"
-```
+- [ ] **Commit:** `feat(zone1): add TruckView with track-position sync and color tinting`
 
 ---
 
-## Task 6: `ConveyorView` — widoczny tor
-
-LineRenderer rysujący zamkniętą pętlę z waypointów. Materiał metalowy szary, stała szerokość ~0.3 jednostek.
-
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/ConveyorView.cs`
-
-- [ ] **Step 1: `ConveyorView.cs`**
+## Task 6: ConveyorView
 
 ```csharp
+// ConveyorView.cs
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -928,59 +717,41 @@ namespace Project.Zone1.Trucks
     [RequireComponent(typeof(LineRenderer))]
     public class ConveyorView : MonoBehaviour
     {
-        [SerializeField] float lineWidth = 0.3f;
+        [SerializeField] float lineWidth = 0.1f;
         [SerializeField] Color lineColor = new(0.4f, 0.4f, 0.45f);
 
         public void Build(IReadOnlyList<ConveyorWaypoint> waypoints)
         {
             var lr = GetComponent<LineRenderer>();
-            lr.useWorldSpace = false;
+            lr.useWorldSpace = true;
             lr.loop = true;
-            lr.startWidth = lineWidth;
-            lr.endWidth = lineWidth;
-            lr.startColor = lineColor;
-            lr.endColor = lineColor;
-
-            var points = new Vector3[waypoints.Count];
-            for (int i = 0; i < waypoints.Count; i++)
-                points[i] = transform.InverseTransformPoint(waypoints[i].Position);
-
-            lr.positionCount = points.Length;
-            lr.SetPositions(points);
+            lr.startWidth = lineWidth; lr.endWidth = lineWidth;
+            lr.startColor = lineColor; lr.endColor = lineColor;
+            var pts = new Vector3[waypoints.Count];
+            for (int i = 0; i < waypoints.Count; i++) pts[i] = waypoints[i].Position;
+            lr.positionCount = pts.Length;
+            lr.SetPositions(pts);
         }
     }
 }
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/ConveyorView.cs
-git commit -m "feat(zone1): add ConveyorView (LineRenderer-based visible track)"
-```
+- [ ] **Commit:** `feat(zone1): add ConveyorView (LineRenderer pętla)`
 
 ---
 
-## Task 7: `GarageView` — parking + tap detection
-
-Layouts truck views w grid w garage area. Na każdą ciężarówkę raycasts dla tap.
-
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/GarageView.cs`
-
-- [ ] **Step 1: `GarageView.cs`**
+## Task 7: GarageView
 
 ```csharp
+// GarageView.cs
 using UnityEngine;
-using System;
 using System.Collections.Generic;
 
 namespace Project.Zone1.Trucks
 {
     public class GarageView : MonoBehaviour
     {
-        [Tooltip("Local positions where parked trucks are placed, indexed by parking slot.")]
-        [SerializeField] Vector3[] parkingSlots;
+        [SerializeField] Vector3[] parkingSlots; // local positions
 
         readonly Dictionary<int, TruckView> truckViewsById = new();
         readonly List<int> orderedTruckIds = new();
@@ -989,8 +760,7 @@ namespace Project.Zone1.Trucks
         {
             int idx = orderedTruckIds.IndexOf(truckId);
             if (idx < 0 || parkingSlots == null || parkingSlots.Length == 0) return transform.position;
-            int slotIdx = idx % parkingSlots.Length;
-            return transform.TransformPoint(parkingSlots[slotIdx]);
+            return transform.TransformPoint(parkingSlots[idx % parkingSlots.Length]);
         }
 
         public void RegisterTruckView(int truckId, TruckView view)
@@ -999,10 +769,6 @@ namespace Project.Zone1.Trucks
             if (!orderedTruckIds.Contains(truckId)) orderedTruckIds.Add(truckId);
         }
 
-        /// <summary>
-        /// Try to detect a truck under the given screen tap position via 3D raycast.
-        /// Returns truck ID if hit, otherwise -1.
-        /// </summary>
         public int TryGetTappedTruckId(Camera cam, Vector2 screenPos)
         {
             if (cam == null) return -1;
@@ -1011,10 +777,8 @@ namespace Project.Zone1.Trucks
             {
                 var view = hit.collider.GetComponentInParent<TruckView>();
                 if (view != null)
-                {
                     foreach (var kv in truckViewsById)
                         if (kv.Value == view) return kv.Key;
-                }
             }
             return -1;
         }
@@ -1022,30 +786,26 @@ namespace Project.Zone1.Trucks
 }
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_Trucks/GarageView.cs
-git commit -m "feat(zone1): add GarageView with parking layout and tap raycast"
-```
+- [ ] **Commit:** `feat(zone1): add GarageView with parking layout and tap raycast`
 
 ---
 
-## Task 8: `Zone1TrucksManager` — orkiestrator
+## Task 8: Update `Zone1Manager.cs` + `Zone1TrucksManager.cs`
 
-MonoBehaviour. Przy `Awake` (odpalany po `Zone1Manager` w Plan #2):
-- Czyta `GameBalanceSO` (TruckCapacity, ConveyorSlotCount, MagnetRateHz)
-- Subskrybuje `OnRefillingChanged` event channel — pause conveyor przy refilling=true
-- Buduje conveyor track z waypointów (serializowane w inspectorze)
-- Tworzy 3 startowe ciężarówki (Apple, Orange, Lemon), instancjonuje TruckView prefaby
-- Tworzy garaż, paruje ciężarówki w GarageView slotach
-- Konfiguruje subscriber dla input router tap → GarageView.TryGetTappedTruckId → Garage.Dispatch
-- W Update: tickuje conveyor + magnet (z FruitGrid z Zone1Manager)
+- [ ] **Step 1:** Open `Assets/_Project/Scripts/Zone1_FruitWall/Zone1Manager.cs`. Find `FruitGrid grid;` and add right after it:
 
-**Files:**
-- Create: `Assets/_Project/Scripts/Zone1_Trucks/Zone1TrucksManager.cs`
+```csharp
+public FruitGrid Grid => grid;
+public Transform WallTransform => wallView != null ? wallView.transform : null;
+public float WallWidthWorldUnits => balance != null && wallView != null
+    ? balance.WallWidthWorldUnits * wallView.transform.lossyScale.x
+    : 0f;
+public float WallLeftXWorld => wallView != null ? wallView.transform.position.x : 0f;
+```
 
-- [ ] **Step 1: `Zone1TrucksManager.cs`**
+(Useful exposures dla Zone1TrucksManager żeby mieć world-space bounds wall'a po zaaplikowaniu Wall.transform.scale.)
+
+- [ ] **Step 2:** Create `Zone1TrucksManager.cs`:
 
 ```csharp
 using System.Collections.Generic;
@@ -1061,22 +821,21 @@ namespace Project.Zone1.Trucks
     {
         [Header("Config")]
         [SerializeField] GameBalanceSO balance;
-        [SerializeField] Zone1Manager zone1Manager; // for FruitGrid access
+        [SerializeField] Zone1Manager zone1Manager;
         [SerializeField] BoolEventChannelSO onRefillingChanged;
 
         [Header("Conveyor")]
         [SerializeField] List<ConveyorWaypoint> conveyorWaypoints;
         [SerializeField] ConveyorView conveyorView;
-        [SerializeField] float truckSpeedUnitsPerSec = 3f;
+        [Tooltip("World units per second.")]
+        [SerializeField] float truckSpeedUnitsPerSec = 1.5f;
 
         [Header("Wall slots (active spots)")]
-        [SerializeField] List<WallSlot> wallSlots; // 3 slots, last one IsStopSlot=true
-        [SerializeField] float wallLeftX = -18f;
-        [SerializeField] float wallWidthWorldUnits = 36f;
+        [SerializeField] List<WallSlot> wallSlots;
 
         [Header("Garage")]
         [SerializeField] GarageView garageView;
-        [SerializeField] GameObject truckViewPrefab; // prefab z TruckView komponentem + ProBuilder modelem
+        [SerializeField] GameObject truckViewPrefab;
 
         [Header("Camera (for tap raycast)")]
         [SerializeField] Camera mainCamera;
@@ -1091,36 +850,27 @@ namespace Project.Zone1.Trucks
 
         void OnEnable()
         {
-            if (onRefillingChanged != null)
-                onRefillingChanged.Raised += OnRefillingChangedHandler;
+            if (onRefillingChanged != null) onRefillingChanged.Raised += OnRefillingChangedHandler;
         }
         void OnDisable()
         {
-            if (onRefillingChanged != null)
-                onRefillingChanged.Raised -= OnRefillingChangedHandler;
+            if (onRefillingChanged != null) onRefillingChanged.Raised -= OnRefillingChangedHandler;
         }
-
-        void OnRefillingChangedHandler(bool value)
-        {
-            isRefilling = value;
-        }
+        void OnRefillingChangedHandler(bool v) => isRefilling = v;
 
         void Start()
         {
             if (balance == null || zone1Manager == null || conveyorView == null
                 || garageView == null || truckViewPrefab == null)
             {
-                Debug.LogError("[Zone1TrucksManager] missing references in inspector");
-                enabled = false;
-                return;
+                Debug.LogError("[Zone1TrucksManager] missing references");
+                enabled = false; return;
             }
 
             track = new ConveyorTrack(conveyorWaypoints);
             conveyorView.Build(track.Waypoints);
-
             garage = new Garage(balance.ConveyorSlotCount);
 
-            // Create starter trucks: 1 per starting fruit type.
             int idCounter = 1;
             foreach (var fruit in balance.StartingFruitTypes)
             {
@@ -1142,19 +892,13 @@ namespace Project.Zone1.Trucks
         {
             float dt = Time.deltaTime;
 
-            // Tap dispatch from garage
             HandleTapDispatch();
 
-            // Conveyor pause during refill
             if (!isRefilling)
-            {
                 track.Tick(trucks, dt, truckSpeedUnitsPerSec);
-            }
 
-            // Stop logic at slot 3 (last wall slot with IsStopSlot=true) — for trucks that can collect
             ApplyStopAtSlotIfShouldCollect();
 
-            // Magnet ticks
             float magnetInterval = 1f / Mathf.Max(0.01f, balance.MagnetRateHz);
             magnetAccumulator += dt;
             while (magnetAccumulator >= magnetInterval)
@@ -1163,63 +907,49 @@ namespace Project.Zone1.Trucks
                 if (!isRefilling) RunMagnetTick();
             }
 
-            // Trucks that became Full → return to garage immediately (placeholder; Plan #4 will route to bottle)
             HandleFullTrucks();
         }
 
         void HandleTapDispatch()
         {
-            // Use Mouse for editor / Touchscreen for mobile. Single tap only.
             Vector2? tapPos = null;
             if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
                 tapPos = Touchscreen.current.primaryTouch.position.ReadValue();
             else if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
                 tapPos = Mouse.current.position.ReadValue();
-
             if (!tapPos.HasValue) return;
+
             int tappedId = garageView.TryGetTappedTruckId(mainCamera, tapPos.Value);
-            if (tappedId >= 0)
-                garage.Dispatch(tappedId);
+            if (tappedId >= 0) garage.Dispatch(tappedId);
         }
 
         void ApplyStopAtSlotIfShouldCollect()
         {
-            // A truck near the stop slot transitions to StoppedAtSlot if it can still collect.
             int stopSlotIdx = -1;
-            for (int i = 0; i < wallSlots.Count; i++)
-                if (wallSlots[i].IsStopSlot) { stopSlotIdx = i; break; }
+            for (int i = 0; i < wallSlots.Count; i++) if (wallSlots[i].IsStopSlot) { stopSlotIdx = i; break; }
             if (stopSlotIdx < 0) return;
 
-            // Convert stop slot world position to track param: linear scan for closest waypoint param.
-            float stopSlotParam = ApproximateTrackParamForWorldPos(wallSlots[stopSlotIdx].WorldPosition);
-            const float stopWindow = 0.02f; // 2% of track length
+            float stopParam = ApproximateTrackParamForWorldPos(wallSlots[stopSlotIdx].WorldPosition);
+            const float stopWindow = 0.02f;
 
             foreach (var truck in trucks)
             {
                 if (truck.State != TruckState.OnConveyor && truck.State != TruckState.EnteringConveyor) continue;
-                float dist = Mathf.Abs(((truck.TrackPosition - stopSlotParam) + 1f) % 1f);
+                float dist = Mathf.Abs(((truck.TrackPosition - stopParam) + 1f) % 1f);
                 dist = Mathf.Min(dist, 1f - dist);
-                if (dist <= stopWindow)
-                {
-                    if (CanTruckStillCollect(truck))
-                        truck.State = TruckState.StoppedAtSlot;
-                }
+                if (dist <= stopWindow && CanTruckStillCollect(truck))
+                    truck.State = TruckState.StoppedAtSlot;
             }
 
-            // Trucks at StoppedAtSlot whose collect criteria no longer hold → resume.
             foreach (var truck in trucks)
-            {
-                if (truck.State != TruckState.StoppedAtSlot) continue;
-                if (!CanTruckStillCollect(truck))
+                if (truck.State == TruckState.StoppedAtSlot && !CanTruckStillCollect(truck))
                     truck.State = TruckState.OnConveyor;
-            }
         }
 
         bool CanTruckStillCollect(Truck truck)
         {
             if (truck.IsFull) return false;
-            // Check: any matching fruit in bottom row?
-            var grid = zone1Manager != null ? zone1Manager.Grid : null;
+            var grid = zone1Manager.Grid;
             if (grid == null) return false;
             for (int x = 0; x < grid.Columns; x++)
                 if (grid.GetCell(x, 0) == truck.FruitColor) return true;
@@ -1228,10 +958,9 @@ namespace Project.Zone1.Trucks
 
         void RunMagnetTick()
         {
-            var grid = zone1Manager != null ? zone1Manager.Grid : null;
+            var grid = zone1Manager.Grid;
             if (grid == null) return;
 
-            // Build list of trucks at active slots with their slotWorldX.
             var trucksAtSlots = new List<(Truck, float)>();
             foreach (var slot in wallSlots)
             {
@@ -1239,23 +968,22 @@ namespace Project.Zone1.Trucks
                 if (nearest != null) trucksAtSlots.Add((nearest, slot.WorldPosition.x));
             }
 
-            MagnetSystem.AssignFruitsToTrucksAtSlots(grid, trucksAtSlots, wallLeftX, wallWidthWorldUnits);
+            MagnetSystem.AssignFruitsToTrucksAtSlots(
+                grid, trucksAtSlots,
+                wallLeftXWorld: zone1Manager.WallLeftXWorld,
+                wallWidthWorld: zone1Manager.WallWidthWorldUnits);
         }
 
         Truck FindTruckNearWaypointWorld(Vector3 slotWorldPos)
         {
-            float bestDist = 1.5f; // proximity threshold
+            float bestDist = 1.0f; // proximity threshold (small scale wall)
             Truck best = null;
             foreach (var truck in trucks)
             {
                 if (truck.State == TruckState.InGarage || truck.State == TruckState.ReturningToGarage) continue;
                 Vector3 truckPos = track.GetWorldPositionAtTrackParam(truck.TrackPosition);
                 float d = Vector3.Distance(truckPos, slotWorldPos);
-                if (d < bestDist)
-                {
-                    bestDist = d;
-                    best = truck;
-                }
+                if (d < bestDist) { bestDist = d; best = truck; }
             }
             return best;
         }
@@ -1266,17 +994,17 @@ namespace Project.Zone1.Trucks
             {
                 if (truck.State != TruckState.StoppedAtSlot && truck.State != TruckState.OnConveyor) continue;
                 if (!truck.IsFull) continue;
-                // Placeholder for Plan #4: instead of "go to bottle", just teleport back to garage.
                 truck.State = TruckState.ReturningToGarage;
                 garage.ReturnToGarage(truck.Id);
+                if (truckViews.TryGetValue(truck.Id, out var view))
+                    view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
             }
         }
 
         float ApproximateTrackParamForWorldPos(Vector3 worldPos)
         {
             const int samples = 200;
-            float bestDist = float.PositiveInfinity;
-            float bestParam = 0f;
+            float bestDist = float.PositiveInfinity, bestParam = 0f;
             for (int i = 0; i < samples; i++)
             {
                 float t = (float)i / samples;
@@ -1290,166 +1018,123 @@ namespace Project.Zone1.Trucks
 }
 ```
 
-> **Wymagana zmiana w `Zone1Manager.cs`**: dodać publiczną właściwość `public FruitGrid Grid => grid;` aby `Zone1TrucksManager` miał dostęp do gridu z poziomu drugiej strefy. Edytuj plik z Plan #2.
-
-- [ ] **Step 2: Update `Zone1Manager.cs`** — dodaj public Grid getter
-
-W `Assets/_Project/Scripts/Zone1_FruitWall/Zone1Manager.cs` znajdź pole `FruitGrid grid;` i tuż pod nim dodaj:
-
-```csharp
-public FruitGrid Grid => grid;
-```
-
-- [ ] **Step 3: Run tests in Unity** — wszystkie EditMode zielone (TruckStateMachineTests N/A bo nie zrobiliśmy w tym planie — zamiast tego ConveyorTrackTests, MagnetSystemTests, GarageTests).
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add Assets/_Project/Scripts/Zone1_FruitWall/Zone1Manager.cs Assets/_Project/Scripts/Zone1_Trucks/Zone1TrucksManager.cs
-git commit -m "feat(zone1): add Zone1TrucksManager orchestrator with refill-pause integration"
-```
+- [ ] **Commit:** `feat(zone1): add Zone1TrucksManager + expose Grid/Wall world bounds in Zone1Manager`
 
 ---
 
-## Task 9: Truck prefab w Unity Editor
+## Task 9: Truck Prefab w Unity Editor
 
-- [ ] **Step 1: Stwórz `TruckPrefab` z ProBuilder**
+Skala dopasowana do small-scale wall (~16 jednostek szerokości):
 
-W scenie tymczasowo: `Tools → ProBuilder → New Shape → Cube`. Skala (1.5, 0.8, 1.0) — to paka. Nazwij `Box`. Dodaj BoxCollider (dla raycast tap detection).
+- **Box** (paka): ProBuilder Cube, scale `(1.0, 0.4, 0.6)`, BoxCollider auto. Kolor zostanie nadpisany w runtime przez `TruckView` na podstawie typu owocu.
+- **Cab** (kabina): ProBuilder Cube, scale `(0.5, 0.3, 0.4)`, position relative do paki: `(0, 0.05, 0.5)` (przed paką, lekko wyżej).
+- **Wheels** (4 koła): Cylinders splaszczone, scale `(0.18, 0.05, 0.18)`, pozycje: `(±0.4, -0.2, ±0.25)`.
 
-Pod nim dorzuć drugi cube (1, 0.5, 0.5) jako `Cab`, pozycja (0, 0.4, 0.7) (nad pakiem od przodu).
+Prefab root: pusty GameObject `TruckPrefab` z 3 dziećmi (Box, Cab, 4 Wheels). `TruckView` komponent na root, w inspectorze `Box Renderer` = drag `Box`.
 
-Pod nim dorzuć 4 walce spłaszczone (0.3, 0.1, 0.3) jako koła w 4 rogach paki.
+Zapisz jako `Assets/_Project/Prefabs/TruckPrefab.prefab`.
 
-Zaznacz root → drag do `Assets/_Project/Prefabs/` jako `TruckPrefab.prefab`.
-
-Dodaj komponent `TruckView` na root prefaba. W inspectorze: `Box Renderer` = drag&drop `Box` z hierarchii prefaba.
-
-Usuń tymczasowy obiekt ze sceny.
-
-- [ ] **Step 2: Commit prefab**
-
-```bash
-git add Assets/_Project/Prefabs/TruckPrefab.prefab Assets/_Project/Prefabs/TruckPrefab.prefab.meta
-git commit -m "feat(zone1): add TruckPrefab with ProBuilder cab+box+wheels and TruckView component"
-```
+- [ ] **Commit:** `feat(zone1): add TruckPrefab (ProBuilder cab+box+wheels)`
 
 ---
 
-## Task 10: Scene wiring (Unity Editor)
+## Task 10: Scene wiring (Unity Editor) — REALISTIC COORDS
 
-- [ ] **Step 1: Dodaj GameObject `[Zone1Trucks]` do `Zone1`**
+> Wszystkie koordynaty w worldspace, oparte na rzeczywistym layoucie sceny: FirstZone=(0,0,0), wall-bottom-row najbliżej kamery przy Z≈-0.87, wall rozciąga się X∈[0,16].
 
-Pod `[World] → Zone1`, prawym → Create Empty → `[Zone1Trucks]`.
-Dodaj komponent `Zone1TrucksManager`.
+- [ ] **Step 1:** Pod `[World] → FirstZone`, prawym → Create Empty → `[Zone1Trucks]`. Position `(0, 0, 0)`. Dodaj komponent `Zone1TrucksManager`.
 
-- [ ] **Step 2: Stwórz waypointy conveyora**
+- [ ] **Step 2: Conveyor waypoints** w inspectorze `Zone1TrucksManager.Conveyor Waypoints` (8 punktów):
 
-Conveyor pętla powinna iść:
-- Pod ścianą (od lewej do prawej): start (-15, -19, -2) → end (15, -19, -2). Po drodze 3 active slots: (-10, -19, -2), (0, -19, -2), (10, -19, -2) [last = stop slot]
-- Po prawej: zakręt do (15, -22, -2)
-- Z prawej do lewej (back): (15, -22, -2) → (-22, -22, -2)
-- Po lewej: (-22, -22, -2) → (-22, -19, -2) (wraca do garażu / wjazd)
-- Wjazd na conveyor: (-22, -19, -2) → start (-15, -19, -2)
+| Idx | Position | IsActiveSlot | SlotIndex | Note |
+|-----|----------|-------------|-----------|------|
+| 0 | (-1.5, 0, -0.5) | false | -1 | Wjazd na conveyor (start) |
+| 1 | (4, 0, -0.5) | true | 0 | Active slot 1 |
+| 2 | (8, 0, -0.5) | true | 1 | Active slot 2 |
+| 3 | (12, 0, -0.5) | true | 2 | Active slot 3 (stop slot) |
+| 4 | (17, 0, -0.5) | false | -1 | Wyjazd ze slotów (zakręt) |
+| 5 | (17, 0, 0.8) | false | -1 | Tył pętli (prawy) |
+| 6 | (-1.5, 0, 0.8) | false | -1 | Tył pętli (lewy) |
+| 7 | (-1.5, 0, -0.5) | false | -1 | (już wpisany jako idx 0; alternatywnie ostatni waypoint nawiązuje do pierwszego — lista zamknięta przez track) |
 
-W inspectorze `Zone1TrucksManager`:
-- `Conveyor Waypoints` → element 0..N (np. 8 punktów):
-  1. Position (-22, -19, -2), IsActiveSlot=false, SlotIndex=-1
-  2. Position (-15, -19, -2), false, -1
-  3. Position (-10, -19, -2), true, 0
-  4. Position (0, -19, -2), true, 1
-  5. Position (10, -19, -2), true, 2 (stop slot — patrz Wall Slots)
-  6. Position (15, -19, -2), false, -1
-  7. Position (15, -22, -2), false, -1
-  8. Position (-22, -22, -2), false, -1
+> Uwaga: track.cs traktuje listę jako pętlę zamkniętą — ostatni waypoint łączy się z pierwszym automatycznie. Idx 7 zostaw jak idx 6 albo usuń. Najprostsze: 7 elementów (0..6), pętla automatyczna.
 
-- [ ] **Step 3: Stwórz `WallSlots`**
+- [ ] **Step 3: Wall slots** (3 sloty) w `Wall Slots`:
 
-W inspectorze `Wall Slots`:
-1. WorldPosition (-10, -19, -2), SlotIndex=0, IsStopSlot=false
-2. WorldPosition (0, -19, -2), SlotIndex=1, IsStopSlot=false
-3. WorldPosition (10, -19, -2), SlotIndex=2, IsStopSlot=true (ostatni, tu trucks stop)
+| Idx | WorldPosition | SlotIndex | IsStopSlot |
+|-----|---------------|-----------|------------|
+| 0 | (4, 0, -0.5) | 0 | false |
+| 1 | (8, 0, -0.5) | 1 | false |
+| 2 | (12, 0, -0.5) | 2 | true |
 
-`Wall Left X` = -18, `Wall Width World Units` = 36 (zgodnie z GameBalanceSO).
+- [ ] **Step 4: Garage GameObject**
 
-- [ ] **Step 4: Garage GameObject + GarageView**
+Pod `[Zone1Trucks]` → Create Empty → `Garage`. Position `(-2.5, 0, 0.2)`. Dodaj `GarageView`. W inspectorze `Parking Slots` (lokalne pozycje):
 
-Pod `[Zone1Trucks]` stwórz pusty `Garage`. Pozycja (-22, -19, -2). Dodaj komponent `GarageView`.
+| Idx | Local Position |
+|-----|----------------|
+| 0 | (0, 0, 0) |
+| 1 | (-0.7, 0, 0.6) |
+| 2 | (0, 0, 0.6) |
 
-W `Parking Slots` dodaj 3 elementy (lokalne pozycje w garażu):
-1. (0, 0, -2)
-2. (1.5, 0, -2)
-3. (3, 0, -2)
+- [ ] **Step 5: Conveyor GameObject**
 
-W `Zone1TrucksManager.Garage View` przeciągnij `Garage` z hierarchii.
+Pod `[Zone1Trucks]` → Create Empty → `Conveyor`. Position `(0, 0, 0)`. Dodaj `LineRenderer` + komponent `ConveyorView`. Material = stwórz `Assets/_Project/Materials/ConveyorMaterial.mat` (Unlit/Color, szary `#666670`).
 
-- [ ] **Step 5: ConveyorView GameObject**
+- [ ] **Step 6: Wiring `Zone1TrucksManager` w inspectorze**
 
-Pod `[Zone1Trucks]` stwórz pusty `Conveyor`. Dodaj `LineRenderer` + komponent `ConveyorView`. Material = nowy stworzony `ConveyorMaterial` (dowolny szary unlit material).
-
-Drag `Conveyor` do pola `Zone1Trucks Manager → Conveyor View`.
-
-- [ ] **Step 6: Inne wiring**
-
-W `Zone1TrucksManager`:
-- `Balance` = `Assets/_Project/Settings/GameBalance.asset`
-- `Zone1 Manager` = drag `[Zone1Manager]` z hierarchii (z Plan #2)
-- `On Refilling Changed` = `Assets/_Project/Settings/Events/OnRefillingChanged.asset`
-- `Truck View Prefab` = drag `Assets/_Project/Prefabs/TruckPrefab.prefab`
-- `Main Camera` = drag Main Camera z hierarchii
-
-`Truck Speed Units Per Sec` = 3 (parametr balansowy — tunable).
+| Pole | Wartość |
+|------|---------|
+| Balance | `Assets/_Project/Settings/GameBalance.asset` |
+| Zone1 Manager | drag `[Zone1Manager]` z hierarchii |
+| On Refilling Changed | `Assets/_Project/Settings/Events/OnRefillingChanged.asset` |
+| Conveyor View | drag `Conveyor` z hierarchii |
+| Truck Speed Units Per Sec | 1.5 |
+| Garage View | drag `Garage` z hierarchii |
+| Truck View Prefab | `Assets/_Project/Prefabs/TruckPrefab.prefab` |
+| Main Camera | drag `Main Camera` |
 
 - [ ] **Step 7: Commit scene**
 
 ```bash
-git add Assets/_Project/Scenes/Main.unity
-git commit -m "feat(scene): wire Zone1Trucks (conveyor waypoints, slots, garage, truck prefab)"
+git add Assets/_Project/Scenes/Main.unity Assets/_Project/Materials/ConveyorMaterial.mat Assets/_Project/Materials/ConveyorMaterial.mat.meta
+git commit -m "feat(scene): wire Zone1Trucks (conveyor pętla, slots, garage) in actual scene coords"
 ```
 
 ---
 
 ## Task 11: Manual playtest + tag
 
-- [ ] **Step 1: Playtest checklist**
+- [ ] **Playtest:**
+  - Play, kamera widzi ścianę leżącą i ground area pod nią.
+  - Trzy ciężarówki (czerwona/pomarańczowa/żółta) stoją w garażu (X≈-2.5, Z≈0.2).
+  - Conveyor LineRenderer widoczny jako szara pętla pod ścianą.
+  - Tap na ciężarówkę → wjeżdża na conveyor, jedzie pętlą.
+  - Tap Refill Wall → ściana fillsię, **conveyor pauzuje** (truck stoi).
+  - Po refilu conveyor wznawia.
+  - Truck dochodzi do slot 3 (X=12), STOP'uje jeśli ma jabłka w bottom row.
+  - Magnet co `1/MagnetRateHz` (5Hz) usuwa jabłko z gridu, increments Load.
+  - Po Load=100 (TruckCapacity): truck znika z conveyora, wraca do garażu.
 
-- Uruchom Play. Scrolluj kamerą do strefy 1.
-- W garażu (lewy dolny róg ekranu, w przodzie ściany) widzisz 3 ciężarówki: czerwona, pomarańczowa, żółta.
-- Conveyor jest widoczny jako szary tor pętlący pod ścianą.
-- Tappuj na czerwoną ciężarówkę → wjeżdża na conveyor i jeździ pętlą.
-- Tappuj `Refill Wall` w HUD → ściana się zapełnia, conveyor PAUSE'uje (ciężarówka stoi).
-- Po refilu conveyor wznawia jazdę.
-- Ciężarówka dojeżdża do slot 3 (najbardziej prawego) → STOPS jeśli ma jabłka w bottom row → zaczyna magnetować jabłka. Load rośnie.
-- Po napełnieniu (Load = 100): ciężarówka znika z conveyora, wraca do garażu (placeholder).
-- Tap można powtórzyć.
+- [ ] **Tests EditMode + PlayMode** wszystkie zielone.
 
-- [ ] **Step 2: Test EditMode + PlayMode**
-
-EditMode: ConveyorTrackTests + MagnetSystemTests + GarageTests + wszystkie poprzednie. Wszystkie zielone.
-PlayMode SceneSmokeTest też.
-
-- [ ] **Step 3: Tag**
-
-```bash
-git tag -a mvp-step3 -m "MVP Step 3: Trucks + Conveyor + Magnet + Garage"
-```
+- [ ] **Tag:** `git tag -a mvp-step3 -m "MVP Step 3: Trucks + Conveyor + Magnet + Garage"`
 
 ---
 
-## Definicja Done dla Plan #3
+## Definicja Done
 
-- ✅ EditMode tests: wszystkie zielone (ConveyorTrack ~5, MagnetSystem ~5, Garage ~5).
-- ✅ Tap na ciężarówkę w garażu → wjazd na conveyor.
-- ✅ Conveyor jeździ pętlą, widoczny tor.
-- ✅ W slot 3 ciężarówka stop'uje gdy może zbierać; magnet działa.
-- ✅ Ściana się opróżnia z bottom row gdy ciężarówki zbierają.
-- ✅ Refill button pauzuje conveyor.
-- ✅ Pełna ciężarówka znika z conveyora, wraca do garażu.
+- ✅ Tap na ciężarówkę → wjazd na conveyor.
+- ✅ Conveyor pętla widoczna, ciężarówki jeżdżą.
+- ✅ STOP w slot 3 gdy może zbierać.
+- ✅ Magnet usuwa owoce z bottom row.
+- ✅ Refill button pauzuje conveyor (przez `OnRefillingChanged`).
+- ✅ Pełna ciężarówka → wraca do garażu (placeholder do Plan #4).
+- ✅ EditMode tests zielone (~15 nowych: ConveyorTrack 5, MagnetSystem 5, Garage 5).
 
 ## Out of Plan #3 (na później)
 
-- Animacja "fly to truck" magnetowanego owoca (Bezier curve) — Plan #3.5 / polishing.
-- Magnet w slotach 1 i 2 (collect "in motion") — w MVP jest tylko stop slot 3. Eksperymentalnie dodać.
-- Big bottle: ciężarówka full → drives to bottle, dumps → returns. Plan #4.
-- Garage z wieloma ciężarówkami per kolor (upgrade). Currently 1 per kolor.
-- Wizualne efekty (kurz pod kołami, dymek z paki). Polish.
+- Animacja "fly to truck" magnetowanego owoca.
+- Magnet w slotach 1 i 2 (collect "in motion") — w MVP tylko stop slot.
+- Big bottle Plan #4.
+- Multiple trucks per kolor (upgrade Plan #5+).
