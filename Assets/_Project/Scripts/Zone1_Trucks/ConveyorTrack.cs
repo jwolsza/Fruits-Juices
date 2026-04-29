@@ -127,11 +127,15 @@ namespace Project.Zone1.Trucks
                 float current = slot.TrackPosition;
                 float desired = current + deltaParam;
 
-                // Find nearest OTHER slot ahead (any slot, not only stopped).
+                // Find nearest OCCUPIED slot ahead. Empty slots don't physically collide
+                // (no actual truck visualized) — they're abstract carriers used for capacity
+                // accounting only. Without this, empty slot in formation could block trailing
+                // trucks even though there's no truck in front of them.
                 float minBlocker = float.PositiveInfinity;
                 for (int j = 0; j < slots.Count; j++)
                 {
                     if (j == idx) continue;
+                    if (slots[j].IsEmpty) continue;
                     float other = slots[j].TrackPosition;
                     float distAhead = (other - current + 1f) % 1f;
                     if (distAhead > 0f && distAhead < minBlocker) minBlocker = distAhead;
