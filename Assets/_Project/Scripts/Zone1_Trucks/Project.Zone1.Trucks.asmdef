@@ -4,7 +4,8 @@
     "references": [
         "Project.Core",
         "Project.Data",
-        "Project.Zone1.FruitWall"
+        "Project.Zone1.FruitWall",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
