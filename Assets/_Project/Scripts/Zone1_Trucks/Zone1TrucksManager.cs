@@ -29,9 +29,10 @@ namespace Project.Zone1.Trucks
         [SerializeField] int entryWaypointIndex = 5;
         [Tooltip("Tolerancja (track-param 0..1) — slot uznany za 'pod entry' jeśli w tym oknie.")]
         [SerializeField] float entryWindowTrackParam = 0.05f;
-        [Tooltip("Pozycje czekających ciężarówek (między garaż a entry waypoint, lerp t).")]
-        [SerializeField] float waitingFirstOffset = 0.7f;
-        [SerializeField] float waitingStepOffset = -0.15f;
+        [Tooltip("Offset pierwszej czekającej ciężarówki względem jej pozycji w garażu (world units).")]
+        [SerializeField] Vector3 waitingFirstOffset = new(0f, 0f, 0.3f);
+        [Tooltip("Dodatkowy offset per kolejny indeks w queue (kolejne czekające stoją dalej od pierwszego).")]
+        [SerializeField] Vector3 waitingStepOffset = new(0f, 0f, 0.2f);
 
         [Header("Wall slots (active spots)")]
         [SerializeField] List<WallSlot> wallSlots;
@@ -176,9 +177,7 @@ namespace Project.Zone1.Trucks
         void UpdateWaitingTruckPositions()
         {
             if (waitingDispatchQueue.Count == 0) return;
-            if (entryWaypointIndex < 0 || entryWaypointIndex >= track.Waypoints.Count) return;
 
-            Vector3 entryPos = track.Waypoints[entryWaypointIndex].Position;
             for (int i = 0; i < waitingDispatchQueue.Count; i++)
             {
                 int id = waitingDispatchQueue[i];
@@ -187,8 +186,7 @@ namespace Project.Zone1.Trucks
                 if (!truckViews.TryGetValue(id, out var view) || view == null) continue;
 
                 Vector3 garagePos = garageView.GetParkPositionFor(id);
-                float t = Mathf.Clamp01(waitingFirstOffset + i * waitingStepOffset);
-                Vector3 waitingPos = Vector3.Lerp(garagePos, entryPos, t);
+                Vector3 waitingPos = garagePos + waitingFirstOffset + i * waitingStepOffset;
                 view.SetWaitingPosition(waitingPos);
             }
         }
