@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Project.Core;
+using Project.Zone1.FruitWall;
 
 namespace Project.Zone1.Trucks
 {
@@ -15,6 +16,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] FruitType type;
         [SerializeField] Zone1TrucksManager manager;
         [SerializeField] TMP_Text label;
+        [Tooltip("Tło button'a (Image), kolorowane na typ owocu. Auto-fallback do Image na tym GameObject.")]
+        [SerializeField] Image backgroundImage;
 
         Button button;
 
@@ -23,6 +26,14 @@ namespace Project.Zone1.Trucks
             type = newType;
             manager = newManager;
             if (label == null) label = GetComponentInChildren<TMP_Text>(includeInactive: true);
+            if (backgroundImage == null) backgroundImage = GetComponent<Image>();
+            ApplyBackgroundColor();
+        }
+
+        void ApplyBackgroundColor()
+        {
+            if (backgroundImage == null) return;
+            backgroundImage.color = FruitColorPalette.GetColor(type);
         }
 
         void Awake()
