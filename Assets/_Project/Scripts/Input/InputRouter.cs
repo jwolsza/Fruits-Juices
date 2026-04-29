@@ -87,6 +87,8 @@ namespace Project.Input
 
             if (downArea == ScreenArea.Joystick)
             {
+                if (position != lastPosition)
+                    onJoystickDrag?.Invoke(position);
                 onJoystickRelease?.Invoke();
                 downArea = ScreenArea.OutsideAll;
                 return;
