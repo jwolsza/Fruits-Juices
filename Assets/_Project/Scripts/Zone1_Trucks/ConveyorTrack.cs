@@ -8,11 +8,21 @@ namespace Project.Zone1.Trucks
         readonly List<ConveyorWaypoint> waypoints;
         readonly float[] segmentLengths;
         readonly float totalLength;
+        readonly List<ConveyorSlot> slots;
+
+        float baseProgress;
+        bool paused;
 
         public IReadOnlyList<ConveyorWaypoint> Waypoints => waypoints;
+        public IReadOnlyList<ConveyorSlot> Slots => slots;
         public float TotalLength => totalLength;
+        public bool Paused
+        {
+            get => paused;
+            set => paused = value;
+        }
 
-        public ConveyorTrack(IList<ConveyorWaypoint> waypoints)
+        public ConveyorTrack(IList<ConveyorWaypoint> waypoints, int slotCount)
         {
             this.waypoints = new List<ConveyorWaypoint>(waypoints);
             int n = this.waypoints.Count;
@@ -26,6 +36,13 @@ namespace Project.Zone1.Trucks
                 total += len;
             }
             totalLength = total;
+
+            slots = new List<ConveyorSlot>(slotCount);
+            for (int i = 0; i < slotCount; i++)
+            {
+                float offset = slotCount > 0 ? (float)i / slotCount : 0f;
+                slots.Add(new ConveyorSlot(i, offset));
+            }
         }
 
         public Vector3 GetWorldPositionAtTrackParam(float t)
@@ -46,34 +63,49 @@ namespace Project.Zone1.Trucks
             return waypoints[0].Position;
         }
 
-        public void Tick(IReadOnlyList<Truck> trucks, float deltaTime, float speedUnitsPerSec)
+        public void Tick(float deltaTime, float speedUnitsPerSec)
         {
-            if (trucks.Count == 0 || totalLength <= 0f) return;
+            if (paused || totalLength <= 0f) return;
             float deltaParam = (speedUnitsPerSec * deltaTime) / totalLength;
-
-            var stoppedPositions = new List<float>();
-            foreach (var t in trucks)
-                if (t.State == TruckState.StoppedAtSlot) stoppedPositions.Add(t.TrackPosition);
-
-            foreach (var truck in trucks)
+            baseProgress = ((baseProgress + deltaParam) % 1f + 1f) % 1f;
+            foreach (var slot in slots)
             {
-                if (truck.State == TruckState.StoppedAtSlot) continue;
-                if (truck.State == TruckState.InGarage) continue;
-                if (truck.State == TruckState.ReturningToGarage) continue;
-
-                float current = truck.TrackPosition;
-                float desired = current + deltaParam;
-                float minBlocker = float.PositiveInfinity;
-                foreach (float sp in stoppedPositions)
-                {
-                    float distAhead = (sp - current + 1f) % 1f;
-                    if (distAhead > 0f && distAhead < minBlocker) minBlocker = distAhead;
-                }
-                if (minBlocker < float.PositiveInfinity && deltaParam >= minBlocker)
-                    desired = current + minBlocker - 0.001f;
-
-                truck.TrackPosition = ((desired % 1f) + 1f) % 1f;
+                slot.TrackPosition = (baseProgress + slot.SlotOffsetFromZero) % 1f;
+                if (slot.Truck != null) slot.Truck.TrackPosition = slot.TrackPosition;
             }
+        }
+
+        /// <summary>
+        /// Find first empty slot and place truck inside it. Returns true on success.
+        /// </summary>
+        public bool TryAssignTruckToFirstEmptySlot(Truck truck)
+        {
+            foreach (var slot in slots)
+            {
+                if (slot.IsEmpty)
+                {
+                    slot.Truck = truck;
+                    truck.TrackPosition = slot.TrackPosition;
+                    truck.State = TruckState.OnConveyor;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public void RemoveTruckFromSlot(Truck truck)
+        {
+            foreach (var slot in slots)
+            {
+                if (slot.Truck == truck) { slot.Truck = null; return; }
+            }
+        }
+
+        public ConveyorSlot FindSlotForTruck(Truck truck)
+        {
+            foreach (var slot in slots)
+                if (slot.Truck == truck) return slot;
+            return null;
         }
     }
 }

@@ -8,7 +8,7 @@ namespace Project.Tests.EditMode
 {
     public class ConveyorTrackTests
     {
-        ConveyorTrack BuildSquare()
+        ConveyorTrack BuildSquare(int slotCount = 4)
         {
             return new ConveyorTrack(new List<ConveyorWaypoint>
             {
@@ -16,7 +16,25 @@ namespace Project.Tests.EditMode
                 new() { Position = new Vector3(10, 0, 0) },
                 new() { Position = new Vector3(10, 0, 10) },
                 new() { Position = new Vector3(0, 0, 10) },
-            });
+            }, slotCount);
+        }
+
+        [Test]
+        public void NewTrack_HasCorrectSlotCount_AndEvenlySpacedSlots()
+        {
+            var t = BuildSquare(slotCount: 4);
+            Assert.AreEqual(4, t.Slots.Count);
+            Assert.That(t.Slots[0].SlotOffsetFromZero, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(t.Slots[1].SlotOffsetFromZero, Is.EqualTo(0.25f).Within(0.001f));
+            Assert.That(t.Slots[2].SlotOffsetFromZero, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(t.Slots[3].SlotOffsetFromZero, Is.EqualTo(0.75f).Within(0.001f));
+        }
+
+        [Test]
+        public void NewTrack_AllSlotsEmpty()
+        {
+            var t = BuildSquare();
+            foreach (var s in t.Slots) Assert.IsTrue(s.IsEmpty);
         }
 
         [Test]
@@ -36,34 +54,73 @@ namespace Project.Tests.EditMode
         }
 
         [Test]
-        public void GetWorldPositionAtTrackParam_LoopsAtOne()
+        public void Tick_AdvancesAllSlotsTogether()
         {
-            var t = BuildSquare();
-            Assert.That(t.GetWorldPositionAtTrackParam(1f), Is.EqualTo(t.GetWorldPositionAtTrackParam(0f)));
+            var t = BuildSquare(slotCount: 2);
+            float prev0 = t.Slots[0].TrackPosition;
+            float prev1 = t.Slots[1].TrackPosition;
+
+            // Total length = 40, advance 4 units → +0.1 base progress
+            t.Tick(deltaTime: 1f, speedUnitsPerSec: 4f);
+
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo((prev0 + 0.1f) % 1f).Within(0.001f));
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo((prev1 + 0.1f) % 1f).Within(0.001f));
         }
 
         [Test]
-        public void Tick_AdvancesAllTrucks_WhenNoneStopped()
+        public void Paused_Tick_DoesNotAdvance()
         {
-            var track = BuildSquare();
-            var t1 = new Truck(1, FruitType.Apple, 100) { TrackPosition = 0f, State = TruckState.OnConveyor };
-            var t2 = new Truck(2, FruitType.Orange, 100) { TrackPosition = 0.25f, State = TruckState.OnConveyor };
-            track.Tick(new[] { t1, t2 }, 1f, 4f);
-            Assert.That(t1.TrackPosition, Is.EqualTo(0.1f).Within(0.001f));
-            Assert.That(t2.TrackPosition, Is.EqualTo(0.35f).Within(0.001f));
+            var t = BuildSquare(slotCount: 2);
+            float prev0 = t.Slots[0].TrackPosition;
+            t.Paused = true;
+            t.Tick(1f, 4f);
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(prev0).Within(0.001f));
         }
 
         [Test]
-        public void Tick_TruckStoppedAtSlot_TrucksBehindFreeze()
+        public void TryAssignTruckToFirstEmptySlot_PutsTruckIntoSlotZero()
         {
-            var track = BuildSquare();
-            var stopped = new Truck(1, FruitType.Apple, 100) { TrackPosition = 0.5f, State = TruckState.StoppedAtSlot };
-            var behind = new Truck(2, FruitType.Apple, 100) { TrackPosition = 0.45f, State = TruckState.OnConveyor };
-            var ahead = new Truck(3, FruitType.Apple, 100) { TrackPosition = 0.6f, State = TruckState.OnConveyor };
-            track.Tick(new[] { stopped, behind, ahead }, 1f, 4f);
-            Assert.That(stopped.TrackPosition, Is.EqualTo(0.5f).Within(0.001f));
-            Assert.That(behind.TrackPosition, Is.LessThanOrEqualTo(0.5f));
-            Assert.That(ahead.TrackPosition, Is.EqualTo(0.7f).Within(0.001f));
+            var t = BuildSquare(slotCount: 4);
+            var truck = new Truck(1, FruitType.Apple, 100);
+            Assert.IsTrue(t.TryAssignTruckToFirstEmptySlot(truck));
+            Assert.AreSame(truck, t.Slots[0].Truck);
+            Assert.AreEqual(TruckState.OnConveyor, truck.State);
+        }
+
+        [Test]
+        public void TryAssignTruckToFirstEmptySlot_AllOccupied_ReturnsFalse()
+        {
+            var t = BuildSquare(slotCount: 2);
+            var t1 = new Truck(1, FruitType.Apple, 100);
+            var t2 = new Truck(2, FruitType.Orange, 100);
+            var t3 = new Truck(3, FruitType.Lemon, 100);
+            Assert.IsTrue(t.TryAssignTruckToFirstEmptySlot(t1));
+            Assert.IsTrue(t.TryAssignTruckToFirstEmptySlot(t2));
+            Assert.IsFalse(t.TryAssignTruckToFirstEmptySlot(t3));
+            Assert.AreEqual(TruckState.InGarage, t3.State);
+        }
+
+        [Test]
+        public void TryAssignTruckToFirstEmptySlot_FillsFromIndexZero()
+        {
+            var t = BuildSquare(slotCount: 3);
+            var t1 = new Truck(1, FruitType.Apple, 100);
+            var t2 = new Truck(2, FruitType.Orange, 100);
+            t.TryAssignTruckToFirstEmptySlot(t1);
+            t.TryAssignTruckToFirstEmptySlot(t2);
+            Assert.AreSame(t1, t.Slots[0].Truck);
+            Assert.AreSame(t2, t.Slots[1].Truck);
+            Assert.IsTrue(t.Slots[2].IsEmpty);
+        }
+
+        [Test]
+        public void RemoveTruckFromSlot_FreesSlot()
+        {
+            var t = BuildSquare(slotCount: 2);
+            var truck = new Truck(1, FruitType.Apple, 100);
+            t.TryAssignTruckToFirstEmptySlot(truck);
+            t.RemoveTruckFromSlot(truck);
+            Assert.IsTrue(t.Slots[0].IsEmpty);
         }
     }
 }

@@ -58,9 +58,9 @@ namespace Project.Zone1.Trucks
                 return;
             }
 
-            track = new ConveyorTrack(conveyorWaypoints);
+            track = new ConveyorTrack(conveyorWaypoints, balance.ConveyorSlotCount);
             conveyorView.Build(track.Waypoints);
-            garage = new Garage(balance.ConveyorSlotCount);
+            garage = new Garage();
 
             int idCounter = 1;
             foreach (var fruit in balance.StartingFruitTypes)
@@ -85,10 +85,11 @@ namespace Project.Zone1.Trucks
 
             HandleTapDispatch();
 
-            if (!isRefilling)
-                track.Tick(trucks, dt, truckSpeedUnitsPerSec);
+            // Determine pause state: refilling OR a truck-bearing slot is at the stop slot AND can collect.
+            bool shouldPause = isRefilling || ShouldPauseConveyorForCollection();
+            track.Paused = shouldPause;
 
-            ApplyStopAtSlotIfShouldCollect();
+            track.Tick(dt, truckSpeedUnitsPerSec);
 
             float magnetInterval = 1f / Mathf.Max(0.01f, balance.MagnetRateHz);
             magnetAccumulator += dt;
@@ -111,31 +112,33 @@ namespace Project.Zone1.Trucks
             if (!tapPos.HasValue) return;
 
             int tappedId = garageView.TryGetTappedTruckId(mainCamera, tapPos.Value);
-            if (tappedId >= 0) garage.Dispatch(tappedId);
+            if (tappedId < 0) return;
+
+            var truck = garage.Get(tappedId);
+            if (truck == null || truck.State != TruckState.InGarage) return;
+
+            // Try to put truck into first empty conveyor slot. If none, do nothing.
+            track.TryAssignTruckToFirstEmptySlot(truck);
         }
 
-        void ApplyStopAtSlotIfShouldCollect()
+        bool ShouldPauseConveyorForCollection()
         {
             int stopSlotIdx = -1;
             for (int i = 0; i < wallSlots.Count; i++)
                 if (wallSlots[i].IsStopSlot) { stopSlotIdx = i; break; }
-            if (stopSlotIdx < 0) return;
+            if (stopSlotIdx < 0) return false;
 
             float stopParam = ApproximateTrackParamForWorldPos(wallSlots[stopSlotIdx].WorldPosition);
             const float stopWindow = 0.02f;
 
-            foreach (var truck in trucks)
+            foreach (var slot in track.Slots)
             {
-                if (truck.State != TruckState.OnConveyor && truck.State != TruckState.EnteringConveyor) continue;
-                float dist = Mathf.Abs(((truck.TrackPosition - stopParam) + 1f) % 1f);
+                if (slot.IsEmpty) continue;
+                float dist = Mathf.Abs(((slot.TrackPosition - stopParam) + 1f) % 1f);
                 dist = Mathf.Min(dist, 1f - dist);
-                if (dist <= stopWindow && CanTruckStillCollect(truck))
-                    truck.State = TruckState.StoppedAtSlot;
+                if (dist <= stopWindow && CanTruckStillCollect(slot.Truck)) return true;
             }
-
-            foreach (var truck in trucks)
-                if (truck.State == TruckState.StoppedAtSlot && !CanTruckStillCollect(truck))
-                    truck.State = TruckState.OnConveyor;
+            return false;
         }
 
         bool CanTruckStillCollect(Truck truck)
@@ -154,10 +157,10 @@ namespace Project.Zone1.Trucks
             if (grid == null) return;
 
             var trucksAtSlots = new List<(Truck, float)>();
-            foreach (var slot in wallSlots)
+            foreach (var wallSlot in wallSlots)
             {
-                Truck nearest = FindTruckNearWaypointWorld(slot.WorldPosition);
-                if (nearest != null) trucksAtSlots.Add((nearest, slot.WorldPosition.x));
+                Truck nearest = FindTruckAtConveyorSlotNear(wallSlot.WorldPosition);
+                if (nearest != null) trucksAtSlots.Add((nearest, wallSlot.WorldPosition.x));
             }
 
             MagnetSystem.AssignFruitsToTrucksAtSlots(
@@ -166,16 +169,16 @@ namespace Project.Zone1.Trucks
                 wallWidthWorld: zone1Manager.WallWidthWorldUnits);
         }
 
-        Truck FindTruckNearWaypointWorld(Vector3 slotWorldPos)
+        Truck FindTruckAtConveyorSlotNear(Vector3 wallSlotWorldPos)
         {
             float bestDist = 1.0f;
             Truck best = null;
-            foreach (var truck in trucks)
+            foreach (var slot in track.Slots)
             {
-                if (truck.State == TruckState.InGarage || truck.State == TruckState.ReturningToGarage) continue;
-                Vector3 truckPos = track.GetWorldPositionAtTrackParam(truck.TrackPosition);
-                float d = Vector3.Distance(truckPos, slotWorldPos);
-                if (d < bestDist) { bestDist = d; best = truck; }
+                if (slot.IsEmpty) continue;
+                Vector3 slotWorldPos = track.GetWorldPositionAtTrackParam(slot.TrackPosition);
+                float d = Vector3.Distance(slotWorldPos, wallSlotWorldPos);
+                if (d < bestDist) { bestDist = d; best = slot.Truck; }
             }
             return best;
         }
@@ -184,10 +187,11 @@ namespace Project.Zone1.Trucks
         {
             foreach (var truck in trucks)
             {
-                if (truck.State != TruckState.StoppedAtSlot && truck.State != TruckState.OnConveyor) continue;
+                if (truck.State != TruckState.OnConveyor) continue;
                 if (!truck.IsFull) continue;
-                truck.State = TruckState.ReturningToGarage;
-                garage.ReturnToGarage(truck.Id);
+                track.RemoveTruckFromSlot(truck);
+                truck.State = TruckState.InGarage;
+                truck.EmptyLoad();
                 if (truckViews.TryGetValue(truck.Id, out var view))
                     view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
             }
