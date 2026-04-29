@@ -17,6 +17,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] float flyDurationSec = 0.3f;
         [Tooltip("Wysokość łuku (peak parabolic, world units).")]
         [SerializeField] float arcHeightWorld = 0.4f;
+        [Tooltip("Mnożnik rozmiaru lecącego owocu względem rozmiaru komórki gridu.")]
+        [SerializeField] float sizeMultiplier = 4f;
         [SerializeField] string sortingLayerName = "Default";
         [SerializeField] int sortingOrder = 100;
 
@@ -46,7 +48,10 @@ namespace Project.Zone1.Trucks
             if (available.Count == 0) return;
             var view = available.Dequeue();
             view.gameObject.SetActive(true);
-            view.transform.localScale = new Vector3(sizeWorld.x, sizeWorld.y, 1f);
+            view.transform.localScale = new Vector3(
+                sizeWorld.x * sizeMultiplier,
+                sizeWorld.y * sizeMultiplier,
+                1f);
             view.SpriteRenderer.color = FruitColorPalette.GetColor(type);
             view.Begin(fromWorld, toWorld, arcHeightWorld, flyDurationSec);
         }
