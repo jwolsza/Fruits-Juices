@@ -99,6 +99,26 @@ namespace Project.Tests.EditMode
         }
 
         [Test]
+        public void TrailingChain_AllSlotsRespectSpacing_EvenWithoutStoppedAhead()
+        {
+            // Slot 0 stopped at 0.5. Slot 1 at 0.4 (gap 0.1). Slot 2 at 0.3 (gap 0.1 to slot 1).
+            // After tick: slot 1 clamps to 0.45 (behind slot 0 with min spacing).
+            //             slot 2 must clamp behind UPDATED slot 1 (0.45) → 0.40, not behind slot 0 directly.
+            var t = BuildSquare(slotCount: 3);
+            t.MinSlotSpacing = 0.05f;
+            t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
+            t.Slots[1].TrackPosition = 0.4f;
+            t.Slots[2].TrackPosition = 0.3f;
+
+            t.Tick(1f, 4f); // delta 0.1
+
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo(0.45f).Within(0.001f));
+            Assert.That(t.Slots[2].TrackPosition, Is.EqualTo(0.40f).Within(0.001f),
+                "slot 2 must respect spacing to slot 1's UPDATED position, not just stopped slots");
+        }
+
+        [Test]
         public void MinSlotSpacing_PreventsOverlap()
         {
             // Slot 0 stopped at 0.5. Slot 1 at 0.49 (already too close given min spacing 0.05).

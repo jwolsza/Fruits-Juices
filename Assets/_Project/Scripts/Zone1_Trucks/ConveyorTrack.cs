@@ -72,32 +72,42 @@ namespace Project.Zone1.Trucks
             return waypoints[0].Position;
         }
 
+        readonly List<int> sortOrderBuffer = new();
+
         /// <summary>
-        /// Advance slots independently. A slot with IsStopped=true stays put; non-stopped slots
-        /// advance by deltaParam but cannot pass within a stopped slot in front (formation pile-up).
+        /// Advance slots independently. A slot with IsStopped=true stays put. Each non-stopped
+        /// slot advances by deltaParam but cannot come closer than MinSlotSpacing to ANY other
+        /// slot ahead (stopped or not). Slots are processed in order of descending TrackPosition
+        /// (front-most first) so trailing slots see the up-to-date positions of leaders.
         /// </summary>
         public void Tick(float deltaTime, float speedUnitsPerSec)
         {
             if (paused || totalLength <= 0f) return;
             float deltaParam = (speedUnitsPerSec * deltaTime) / totalLength;
 
-            var stoppedPositions = new List<float>();
-            foreach (var s in slots)
-                if (s.IsStopped) stoppedPositions.Add(s.TrackPosition);
+            // Build processing order: indices of slots sorted by descending TrackPosition.
+            sortOrderBuffer.Clear();
+            for (int i = 0; i < slots.Count; i++) sortOrderBuffer.Add(i);
+            sortOrderBuffer.Sort((a, b) => slots[b].TrackPosition.CompareTo(slots[a].TrackPosition));
 
-            foreach (var slot in slots)
+            foreach (int idx in sortOrderBuffer)
             {
+                var slot = slots[idx];
                 if (slot.IsStopped) continue;
 
                 float current = slot.TrackPosition;
                 float desired = current + deltaParam;
 
+                // Find nearest OTHER slot ahead (any slot, not only stopped).
                 float minBlocker = float.PositiveInfinity;
-                foreach (float sp in stoppedPositions)
+                for (int j = 0; j < slots.Count; j++)
                 {
-                    float distAhead = (sp - current + 1f) % 1f;
+                    if (j == idx) continue;
+                    float other = slots[j].TrackPosition;
+                    float distAhead = (other - current + 1f) % 1f;
                     if (distAhead > 0f && distAhead < minBlocker) minBlocker = distAhead;
                 }
+
                 if (minBlocker < float.PositiveInfinity)
                 {
                     float maxAdvance = Mathf.Max(0f, minBlocker - minSlotSpacing);
