@@ -7,10 +7,17 @@ namespace Project.Data
     public class GameBalanceSO : ScriptableObject
     {
         [Header("Wall (sand-physics grid)")]
-        public int WallColumns = 1000;
-        public int WallRows = 1000;
+        public int WallColumns = 300;
+        public int WallRows = 300;
+        [Tooltip("Total wall width in world units. Cell width = WallWidthWorldUnits / WallColumns.")]
+        public float WallWidthWorldUnits = 36f;
+        [Tooltip("Total wall height in world units. Cell height = WallHeightWorldUnits / WallRows.")]
+        public float WallHeightWorldUnits = 36f;
         public float GravityRateHz = 10f;
-        public float FruitSpawnRateHz = 2f;
+
+        [Header("Wall refill")]
+        public float RefillTickRateHz = 30f;
+        public int RefillSpawnsPerTick = 100;
 
         [Header("Trucks / Conveyor")]
         public float MagnetRateHz = 5f;
@@ -50,10 +57,14 @@ namespace Project.Data
 
         public void ResetToDefaults()
         {
-            WallColumns = 1000;
-            WallRows = 1000;
+            WallColumns = 300;
+            WallRows = 300;
+            WallWidthWorldUnits = 36f;
+            WallHeightWorldUnits = 36f;
             GravityRateHz = 10f;
-            FruitSpawnRateHz = 2f;
+
+            RefillTickRateHz = 30f;
+            RefillSpawnsPerTick = 100;
 
             MagnetRateHz = 5f;
             ConveyorSlotCount = 4;
