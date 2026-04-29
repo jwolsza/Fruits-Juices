@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro;
 using Project.Zone1.FruitWall;
 
 namespace Project.Zone1.Trucks
@@ -8,6 +9,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] Renderer boxRenderer;
         [Tooltip("Pivot, którego Y-scale rośnie z Load/Capacity (0..1). Box renderer powinien być jego dzieckiem.")]
         [SerializeField] Transform boxPivot;
+        [Tooltip("Opcjonalny TextMeshPro 3D — wyświetla procent napełnienia trucka (np. \"75%\").")]
+        [SerializeField] TextMeshPro fillPercentText;
 
         Truck truck;
         ConveyorTrack track;
@@ -26,11 +29,21 @@ namespace Project.Zone1.Trucks
 
         void UpdateBoxFillScale()
         {
-            if (boxPivot == null || truck.Capacity <= 0) return;
+            if (truck.Capacity <= 0) return;
             float fill = Mathf.Clamp01((float)truck.Load / truck.Capacity);
-            var s = boxPivot.localScale;
-            s.y = fill;
-            boxPivot.localScale = s;
+
+            if (boxPivot != null)
+            {
+                var s = boxPivot.localScale;
+                s.y = fill;
+                boxPivot.localScale = s;
+            }
+
+            if (fillPercentText != null)
+            {
+                int percent = Mathf.RoundToInt(fill * 100f);
+                fillPercentText.text = $"{percent}%";
+            }
         }
 
         void ApplyColor()
