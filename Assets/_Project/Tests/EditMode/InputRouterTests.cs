@@ -27,9 +27,12 @@ namespace Project.Tests.EditMode
 
         InputRouter NewRouter(FakeJoystick j, FakeScroll s, out List<Vector2> taps)
         {
+            // Test classifier mimics the legacy bottom-left 40% screen-area behavior
+            // so existing assertions on (100,100) → Joystick and (W/2, H/2) → Scroll keep working.
             var capturedTaps = new List<Vector2>();
+            Vector2 screenSize = new Vector2(W, H);
             var router = new InputRouter(
-                screenSize: new Vector2(W, H),
+                classify: pos => ScreenAreaUtils.Classify(pos, screenSize),
                 tapDistanceThresholdPx: 10f,
                 tapTimeThresholdSec: 0.2f,
                 onJoystickPress: j.OnPress,
@@ -117,6 +120,29 @@ namespace Project.Tests.EditMode
             CollectionAssert.Contains(j.Events, "release");
             Assert.IsEmpty(s.Events);
             Assert.IsEmpty(taps);
+        }
+
+        [Test]
+        public void Classifier_IsConsultedPerPointerDown()
+        {
+            // Custom classifier that flips based on Y mid-line (not the default screen-area).
+            int callCount = 0;
+            var router = new InputRouter(
+                classify: pos => { callCount++; return pos.y < 500 ? ScreenArea.Joystick : ScreenArea.Scroll; },
+                tapDistanceThresholdPx: 10f,
+                tapTimeThresholdSec: 0.2f,
+                onJoystickPress: _ => { },
+                onJoystickDrag: _ => { },
+                onJoystickRelease: () => { },
+                onScrollDragDelta: _ => { },
+                onScrollRelease: () => { },
+                onTap: _ => { });
+
+            router.OnPointerDown(new Vector2(900, 100), 0f);
+            router.OnPointerUp(new Vector2(900, 100), 0.05f);
+            router.OnPointerDown(new Vector2(900, 1000), 0.1f);
+
+            Assert.AreEqual(2, callCount, "classifier consulted on each PointerDown");
         }
     }
 }

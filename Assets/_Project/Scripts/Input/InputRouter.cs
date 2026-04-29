@@ -5,7 +5,7 @@ namespace Project.Input
 {
     public class InputRouter
     {
-        readonly Vector2 screenSize;
+        readonly Func<Vector2, ScreenArea> classify;
         readonly float tapDistanceThresholdPx;
         readonly float tapTimeThresholdSec;
 
@@ -23,7 +23,7 @@ namespace Project.Input
         bool exceededMovementThreshold;
 
         public InputRouter(
-            Vector2 screenSize,
+            Func<Vector2, ScreenArea> classify,
             float tapDistanceThresholdPx,
             float tapTimeThresholdSec,
             Action<Vector2> onJoystickPress,
@@ -33,7 +33,7 @@ namespace Project.Input
             Action onScrollRelease,
             Action<Vector2> onTap)
         {
-            this.screenSize = screenSize;
+            this.classify = classify;
             this.tapDistanceThresholdPx = tapDistanceThresholdPx;
             this.tapTimeThresholdSec = tapTimeThresholdSec;
             this.onJoystickPress = onJoystickPress;
@@ -47,7 +47,7 @@ namespace Project.Input
 
         public void OnPointerDown(Vector2 position, float timeSec)
         {
-            downArea = ScreenAreaUtils.Classify(position, screenSize);
+            downArea = classify(position);
             downPosition = position;
             lastPosition = position;
             downTime = timeSec;

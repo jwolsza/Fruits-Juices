@@ -9,9 +9,19 @@ namespace Project.Input
         [SerializeField] Camera mainCamera;
         [SerializeField] float minX = 0f;
         [SerializeField] float maxX = 24f;
+        [Tooltip("Konwersja px → world. 0.01 = 100 px to 1 jednostka świata.")]
         [SerializeField] float pixelsToWorld = 0.01f;
         [SerializeField] float rubberStrength = 0.5f;
         [SerializeField] float snapBackSpeed = 10f;
+        [Tooltip("Tarcie/drag dla inercji po puszczeniu palca (jednostek/s²).")]
+        [SerializeField] float drag = 5f;
+
+        [Header("Player Zone Detection (raycast)")]
+        [Tooltip("Tap/drag z rayem trafiającym w world X >= ta wartość = sterowanie graczem (joystick). " +
+                 "Inaczej = scroll kamerą. Default 19 = środkowy punkt między strefą 2 (12) a strefą 3 (24).")]
+        [SerializeField] float playerZoneMinWorldX = 19f;
+        [Tooltip("Y poziomu gruntu używanego do raycastu (najczęściej 0 lub wysokość zone stuba).")]
+        [SerializeField] float groundPlaneY = 0f;
 
         [Header("Joystick")]
         [SerializeField] float joystickMaxRadiusPx = 100f;
@@ -32,18 +42,33 @@ namespace Project.Input
             joystick = new JoystickArea(joystickMaxRadiusPx);
             float startX = mainCamera != null ? mainCamera.transform.position.x : 12f;
             scroll = new CameraScrollController(
-                minX, maxX, pixelsToWorld, rubberStrength, snapBackSpeed, startX);
+                minX, maxX, pixelsToWorld, rubberStrength, snapBackSpeed, drag, startX);
 
             router = new InputRouter(
-                screenSize: new Vector2(Screen.width, Screen.height),
+                classify: ClassifyByGroundRaycast,
                 tapDistanceThresholdPx: tapDistancePx,
                 tapTimeThresholdSec: tapTimeSec,
                 onJoystickPress: p => joystick.OnPress(p),
                 onJoystickDrag: p => joystick.OnDrag(p),
                 onJoystickRelease: () => joystick.OnRelease(),
-                onScrollDragDelta: d => scroll.OnDragDelta(d),
+                onScrollDragDelta: d => scroll.OnDragDelta(d, Time.deltaTime),
                 onScrollRelease: () => scroll.OnRelease(),
                 onTap: HandleTap);
+        }
+
+        ScreenArea ClassifyByGroundRaycast(Vector2 screenPos)
+        {
+            if (mainCamera == null) return ScreenArea.Scroll;
+
+            Plane ground = new Plane(Vector3.up, new Vector3(0f, groundPlaneY, 0f));
+            Ray ray = mainCamera.ScreenPointToRay(screenPos);
+            if (ground.Raycast(ray, out float distance))
+            {
+                Vector3 hitPoint = ray.GetPoint(distance);
+                return hitPoint.x >= playerZoneMinWorldX ? ScreenArea.Joystick : ScreenArea.Scroll;
+            }
+
+            return ScreenArea.Scroll;
         }
 
         void HandleTap(Vector2 screenPos)
