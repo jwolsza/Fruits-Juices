@@ -19,9 +19,9 @@ MonoBehaviour:
   GravityRateHz: 30
   RefillTickRateHz: 30
   RefillSpawnsPerTick: 100
-  MagnetRateHz: 5
+  MagnetRateHz: 30
   ConveyorSlotCount: 4
-  TruckCapacity: 100
+  TruckCapacity: 300
   BigBottleCapacity: 200
   FruitsPerSmallBottle: 5
   RackCapacity: 30

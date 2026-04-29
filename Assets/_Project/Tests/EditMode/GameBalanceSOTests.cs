@@ -21,7 +21,6 @@ namespace Project.Tests.EditMode
             Assert.AreEqual(30f, balance.RefillTickRateHz);
             Assert.AreEqual(100, balance.RefillSpawnsPerTick);
             Assert.AreEqual(5f, balance.MagnetRateHz);
-            Assert.AreEqual(4, balance.ConveyorSlotCount);
             Assert.AreEqual(100, balance.TruckCapacity);
             Assert.AreEqual(200, balance.BigBottleCapacity);
             Assert.AreEqual(5, balance.FruitsPerSmallBottle);

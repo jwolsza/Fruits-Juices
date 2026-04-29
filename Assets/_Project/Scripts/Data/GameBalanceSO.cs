@@ -21,7 +21,6 @@ namespace Project.Data
 
         [Header("Trucks / Conveyor")]
         public float MagnetRateHz = 5f;
-        public int ConveyorSlotCount = 4;
         public int TruckCapacity = 100;
 
         [Header("Big bottles & racks")]
@@ -67,7 +66,6 @@ namespace Project.Data
             RefillSpawnsPerTick = 100;
 
             MagnetRateHz = 5f;
-            ConveyorSlotCount = 4;
             TruckCapacity = 100;
 
             BigBottleCapacity = 200;
