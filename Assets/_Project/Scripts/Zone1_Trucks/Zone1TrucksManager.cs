@@ -32,6 +32,10 @@ namespace Project.Zone1.Trucks
         [Header("Camera (for tap raycast)")]
         [SerializeField] Camera mainCamera;
 
+        [Header("Flying fruit animation")]
+        [SerializeField] FlyingFruitPool flyingFruitPool;
+        [SerializeField] FruitWall.WallView wallView;
+
         ConveyorTrack track;
         Garage garage;
         readonly List<Truck> trucks = new();
@@ -175,8 +179,22 @@ namespace Project.Zone1.Trucks
                 if (nearest != null) activeTrucks.Add(nearest);
             }
 
-            MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucks, magnetTickIndex);
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucks, magnetTickIndex);
             magnetTickIndex++;
+
+            if (flyingFruitPool != null && wallView != null)
+            {
+                Vector2 cellSize = wallView.GetCellWorldSize();
+                foreach (var a in assignments)
+                {
+                    Vector3 from = wallView.GetCellWorldPosition(a.GridCellRemoved.x, a.GridCellRemoved.y);
+                    if (truckViews.TryGetValue(a.Truck.Id, out var view) && view != null)
+                    {
+                        Vector3 to = view.transform.position;
+                        flyingFruitPool.Fly(from, to, a.FruitType, cellSize);
+                    }
+                }
+            }
         }
 
         Truck FindTruckAtConveyorSlotNear(Vector3 wallSlotWorldPos)
