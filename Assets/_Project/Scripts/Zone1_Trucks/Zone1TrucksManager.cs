@@ -102,10 +102,14 @@ namespace Project.Zone1.Trucks
             var go = Instantiate(truckViewPrefab, transform);
             go.name = $"TruckView_{type}_{truck.Id}";
             var view = go.GetComponent<TruckView>();
-            Vector3 parkPos = garageView.GetParkPositionFor(truck.Id);
-            view.Bind(truck, track, parkPos);
+
+            // Register FIRST so GetParkPositionFor can resolve the truck's index
+            // (IndexOf in orderedTruckIds). Without this all trucks fall back to garage origin.
             garageView.RegisterTruckView(truck.Id, view);
             truckViews[truck.Id] = view;
+
+            Vector3 parkPos = garageView.GetParkPositionFor(truck.Id);
+            view.Bind(truck, track, parkPos);
             return true;
         }
 
