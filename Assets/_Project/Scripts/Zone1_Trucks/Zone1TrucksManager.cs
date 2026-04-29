@@ -24,6 +24,15 @@ namespace Project.Zone1.Trucks
         [Tooltip("Wymagany odstęp między ciężarówkami na torze (world units).")]
         [SerializeField] float gapBetweenTrucksWorldUnits = 0.3f;
 
+        [Header("Conveyor entry point")]
+        [Tooltip("Waypoint index gdzie nowe ciężarówki wjeżdżają na conveyor.")]
+        [SerializeField] int entryWaypointIndex = 5;
+        [Tooltip("Tolerancja (track-param 0..1) — slot uznany za 'pod entry' jeśli w tym oknie.")]
+        [SerializeField] float entryWindowTrackParam = 0.05f;
+        [Tooltip("Pozycje czekających ciężarówek (między garaż a entry waypoint, lerp t).")]
+        [SerializeField] float waitingFirstOffset = 0.7f;
+        [SerializeField] float waitingStepOffset = -0.15f;
+
         [Header("Wall slots (active spots)")]
         [SerializeField] List<WallSlot> wallSlots;
 
@@ -42,6 +51,7 @@ namespace Project.Zone1.Trucks
         Garage garage;
         readonly List<Truck> trucks = new();
         readonly Dictionary<int, TruckView> truckViews = new();
+        readonly List<int> waitingDispatchQueue = new();
 
         float magnetAccumulator;
         int magnetTickIndex;
@@ -103,6 +113,9 @@ namespace Project.Zone1.Trucks
             UpdateSlotStopStates();
             track.Tick(dt, truckSpeedUnitsPerSec);
 
+            ProcessWaitingDispatchQueue();
+            UpdateWaitingTruckPositions();
+
             float magnetInterval = 1f / Mathf.Max(0.01f, balance.MagnetRateHz);
             magnetAccumulator += dt;
             while (magnetAccumulator >= magnetInterval)
@@ -129,8 +142,55 @@ namespace Project.Zone1.Trucks
             var truck = garage.Get(tappedId);
             if (truck == null || truck.State != TruckState.InGarage) return;
 
-            // Try to put truck into first empty conveyor slot. If none, do nothing.
-            track.TryAssignTruckToFirstEmptySlot(truck);
+            // Capacity guard: occupied conveyor slots + already queued must leave room for one more.
+            int occupied = track.Slots.Count - track.EmptySlotCount;
+            if (occupied + waitingDispatchQueue.Count >= track.Slots.Count) return; // path full, reject
+
+            // Try immediate assignment AT entry waypoint slot (only if a slot is sitting under entry now).
+            float entryParam = track.GetWaypointTrackParam(entryWaypointIndex);
+            bool placed = waitingDispatchQueue.Count == 0
+                && track.TryAssignTruckAtTrackParam(truck, entryParam, entryWindowTrackParam);
+            if (placed) return;
+
+            // Otherwise queue truck for waiting dispatch.
+            truck.State = TruckState.WaitingDispatch;
+            waitingDispatchQueue.Add(truck.Id);
+        }
+
+        void ProcessWaitingDispatchQueue()
+        {
+            if (waitingDispatchQueue.Count == 0) return;
+            float entryParam = track.GetWaypointTrackParam(entryWaypointIndex);
+
+            int firstId = waitingDispatchQueue[0];
+            var truck = garage.Get(firstId);
+            if (truck == null || truck.State != TruckState.WaitingDispatch)
+            {
+                waitingDispatchQueue.RemoveAt(0);
+                return;
+            }
+            if (track.TryAssignTruckAtTrackParam(truck, entryParam, entryWindowTrackParam))
+                waitingDispatchQueue.RemoveAt(0);
+        }
+
+        void UpdateWaitingTruckPositions()
+        {
+            if (waitingDispatchQueue.Count == 0) return;
+            if (entryWaypointIndex < 0 || entryWaypointIndex >= track.Waypoints.Count) return;
+
+            Vector3 entryPos = track.Waypoints[entryWaypointIndex].Position;
+            for (int i = 0; i < waitingDispatchQueue.Count; i++)
+            {
+                int id = waitingDispatchQueue[i];
+                var truck = garage.Get(id);
+                if (truck == null) continue;
+                if (!truckViews.TryGetValue(id, out var view) || view == null) continue;
+
+                Vector3 garagePos = garageView.GetParkPositionFor(id);
+                float t = Mathf.Clamp01(waitingFirstOffset + i * waitingStepOffset);
+                Vector3 waitingPos = Vector3.Lerp(garagePos, entryPos, t);
+                view.SetWaitingPosition(waitingPos);
+            }
         }
 
         void UpdateSlotStopStates()
@@ -226,6 +286,7 @@ namespace Project.Zone1.Trucks
                 truck.EmptyLoad();
                 if (truckViews.TryGetValue(truck.Id, out var view))
                     view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                waitingDispatchQueue.Remove(truck.Id);
             }
         }
 

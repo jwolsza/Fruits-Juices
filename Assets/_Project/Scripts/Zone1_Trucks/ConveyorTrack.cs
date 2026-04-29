@@ -164,6 +164,47 @@ namespace Project.Zone1.Trucks
             return false;
         }
 
+        /// <summary>
+        /// Assigns truck only if there's an empty slot within `windowTrackParam` distance from
+        /// `entryTrackParam`. Used dla "wjazd na conveyor w konkretnym waypoincie" — truck
+        /// trafia na slot który aktualnie jest pod punktem wjazdu.
+        /// </summary>
+        public bool TryAssignTruckAtTrackParam(Truck truck, float entryTrackParam, float windowTrackParam)
+        {
+            foreach (var slot in slots)
+            {
+                if (!slot.IsEmpty) continue;
+                float dist = Mathf.Abs(((slot.TrackPosition - entryTrackParam) + 1f) % 1f);
+                dist = Mathf.Min(dist, 1f - dist);
+                if (dist <= windowTrackParam)
+                {
+                    slot.Truck = truck;
+                    truck.TrackPosition = slot.TrackPosition;
+                    truck.State = TruckState.OnConveyor;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public float GetWaypointTrackParam(int waypointIndex)
+        {
+            if (waypointIndex < 0 || waypointIndex >= waypoints.Count || totalLength <= 0f) return 0f;
+            float dist = 0f;
+            for (int i = 0; i < waypointIndex; i++) dist += segmentLengths[i];
+            return dist / totalLength;
+        }
+
+        public int EmptySlotCount
+        {
+            get
+            {
+                int n = 0;
+                foreach (var s in slots) if (s.IsEmpty) n++;
+                return n;
+            }
+        }
+
         public void RemoveTruckFromSlot(Truck truck)
         {
             foreach (var slot in slots)

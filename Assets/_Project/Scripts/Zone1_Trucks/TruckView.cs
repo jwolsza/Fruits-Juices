@@ -15,6 +15,7 @@ namespace Project.Zone1.Trucks
         Truck truck;
         ConveyorTrack track;
         Vector3 garageParkPosition;
+        Vector3 waitingPosition;
         Material boxMaterial;
 
         public void Bind(Truck truck, ConveyorTrack track, Vector3 garageParkPosition)
@@ -26,6 +27,7 @@ namespace Project.Zone1.Trucks
         }
 
         public void SetGaragePosition(Vector3 pos) => garageParkPosition = pos;
+        public void SetWaitingPosition(Vector3 pos) => waitingPosition = pos;
 
         void UpdateBoxFillScale()
         {
@@ -68,6 +70,10 @@ namespace Project.Zone1.Trucks
                 case TruckState.InGarage:
                 case TruckState.ReturningToGarage:
                     transform.position = garageParkPosition;
+                    transform.rotation = Quaternion.identity;
+                    break;
+                case TruckState.WaitingDispatch:
+                    transform.position = waitingPosition;
                     transform.rotation = Quaternion.identity;
                     break;
                 default:
