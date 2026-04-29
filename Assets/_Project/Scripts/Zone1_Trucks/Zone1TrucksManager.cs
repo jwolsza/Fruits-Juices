@@ -190,8 +190,7 @@ namespace Project.Zone1.Trucks
                     Vector3 from = wallView.GetCellWorldPosition(a.GridCellRemoved.x, a.GridCellRemoved.y);
                     if (truckViews.TryGetValue(a.Truck.Id, out var view) && view != null)
                     {
-                        Vector3 to = view.transform.position;
-                        flyingFruitPool.Fly(from, to, a.FruitType, cellSize);
+                        flyingFruitPool.Fly(view.transform, from, a.FruitType, cellSize);
                     }
                 }
             }

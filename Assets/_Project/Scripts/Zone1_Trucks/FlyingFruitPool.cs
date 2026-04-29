@@ -43,21 +43,25 @@ namespace Project.Zone1.Trucks
             }
         }
 
-        public void Fly(Vector3 fromWorld, Vector3 toWorld, FruitType type, Vector2 sizeWorld)
+        public void Fly(Transform target, Vector3 fromWorld, FruitType type, Vector2 sizeWorld)
         {
-            if (available.Count == 0) return;
+            if (available.Count == 0 || target == null) return;
             var view = available.Dequeue();
             view.gameObject.SetActive(true);
-            view.transform.localScale = new Vector3(
-                sizeWorld.x * sizeMultiplier,
-                sizeWorld.y * sizeMultiplier,
-                1f);
+
+            // Parent najpierw, potem ustaw localScale dzieląc przez parent lossyScale,
+            // żeby finalny world size = sizeWorld * sizeMultiplier (niezależny od target scale).
+            view.Begin(target, fromWorld, arcHeightWorld, flyDurationSec);
+            Vector3 lossy = target.lossyScale;
+            float sx = lossy.x != 0f ? sizeWorld.x * sizeMultiplier / lossy.x : sizeWorld.x * sizeMultiplier;
+            float sy = lossy.y != 0f ? sizeWorld.y * sizeMultiplier / lossy.y : sizeWorld.y * sizeMultiplier;
+            view.transform.localScale = new Vector3(sx, sy, 1f);
             view.SpriteRenderer.color = FruitColorPalette.GetColor(type);
-            view.Begin(fromWorld, toWorld, arcHeightWorld, flyDurationSec);
         }
 
         void ReturnToPool(FlyingFruitView view)
         {
+            view.transform.SetParent(transform, worldPositionStays: false);
             view.gameObject.SetActive(false);
             available.Enqueue(view);
         }

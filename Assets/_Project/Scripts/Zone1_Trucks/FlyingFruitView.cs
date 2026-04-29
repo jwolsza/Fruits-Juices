@@ -4,17 +4,16 @@ using UnityEngine;
 namespace Project.Zone1.Trucks
 {
     /// <summary>
-    /// Pojedynczy "flying fruit" sprite. Animuje się od pozycji startowej do końcowej
-    /// po krzywej (Bezier z peak'iem ponad linią), potem wywołuje OnFlightDone i jest
-    /// returned to pool przez managera.
+    /// Pojedynczy "flying fruit" sprite. Animuje się od pozycji startowej (world) do
+    /// localPosition (0,0,0) w przestrzeni TARGETU (zwykle ciężarówki) — dzięki temu
+    /// gdy target się porusza, owoc nadal go trafia. Parabolic arc na local Y.
     /// </summary>
     public class FlyingFruitView : MonoBehaviour
     {
         public SpriteRenderer SpriteRenderer { get; private set; }
         public Action<FlyingFruitView> OnFlightDone;
 
-        Vector3 from;
-        Vector3 to;
+        Vector3 startLocal;
         float arcHeight;
         float duration;
         float elapsed;
@@ -25,15 +24,15 @@ namespace Project.Zone1.Trucks
             SpriteRenderer = GetComponent<SpriteRenderer>();
         }
 
-        public void Begin(Vector3 fromWorld, Vector3 toWorld, float arcHeightWorld, float durationSec)
+        public void Begin(Transform target, Vector3 fromWorld, float arcHeightWorld, float durationSec)
         {
-            from = fromWorld;
-            to = toWorld;
+            transform.SetParent(target, worldPositionStays: false);
+            startLocal = target.InverseTransformPoint(fromWorld);
+            transform.localPosition = startLocal;
             arcHeight = arcHeightWorld;
             duration = Mathf.Max(0.01f, durationSec);
             elapsed = 0f;
             flying = true;
-            transform.position = from;
         }
 
         void Update()
@@ -42,10 +41,9 @@ namespace Project.Zone1.Trucks
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
 
-            Vector3 linear = Vector3.Lerp(from, to, t);
-            // Parabolic arc on Y: peak at t=0.5.
+            Vector3 linear = Vector3.Lerp(startLocal, Vector3.zero, t);
             float arc = Mathf.Sin(t * Mathf.PI) * arcHeight;
-            transform.position = new Vector3(linear.x, linear.y + arc, linear.z);
+            transform.localPosition = new Vector3(linear.x, linear.y + arc, linear.z);
 
             if (t >= 1f)
             {
