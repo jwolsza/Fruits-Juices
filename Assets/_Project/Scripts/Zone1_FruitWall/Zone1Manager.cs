@@ -17,6 +17,13 @@ namespace Project.Zone1.FruitWall
         RefillController refill;
         SystemRandomSource rng;
 
+        public FruitGrid Grid => grid;
+        public Transform WallTransform => wallView != null ? wallView.transform : null;
+        public float WallWidthWorldUnits => balance != null && wallView != null
+            ? balance.WallWidthWorldUnits * wallView.transform.lossyScale.x
+            : 0f;
+        public float WallLeftXWorld => wallView != null ? wallView.transform.position.x : 0f;
+
         float gravityAccumulator;
         float refillAccumulator;
         int gravityTickIndex;
