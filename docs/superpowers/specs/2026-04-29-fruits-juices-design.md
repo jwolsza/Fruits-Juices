@@ -47,10 +47,11 @@ Mobilna gra 3D w stylu casual idle. Gracz prowadzi mini-fabrykę soków z owocó
 
 ## 3. Strefa 1 — Ściana z owocami i ciężarówki
 
-### 3.1 Ściana (grid + sand-physics)
+### 3.1 Ściana (grid + sand-physics + manual refill)
 
-- Grid: **1000 kolumn × 1000 wierszy** (parametr SO `GameBalanceSO.WallColumns/Rows`). Komórka = mała kostka.
+- Grid: **300 kolumn × 300 wierszy** (parametr SO `GameBalanceSO.WallColumns/Rows`). Cała ściana widoczna w kamerze (rendering wszystkich komórek; przy 90 000 instancji warto SpriteRenderer + culling/batching).
 - Każda komórka: zajęta (typ owoca) lub pusta.
+- Wizualizacja: **2D SpriteRenderer per komórka** z prostą kwadratową grafiką, kolor sprite'a = typ owoca. Cała ściana jest jedną siatką sprite'ów ulokowaną pionowo w przestrzeni 3D (oś Y to wysokość ściany, oś X szerokość). Cell-size konfigurowalny (`CellSizeWorldUnits`, default ~0.05).
 - **Brak fizyki**, własna sztuczna grawitacja (sand-style):
   - Tick co `1/GravityRateHz` sekundy (default 10Hz).
   - Iteracja od dołu w górę. Dla każdej zajętej komórki `(x, y)`:
@@ -59,8 +60,12 @@ Mobilna gra 3D w stylu casual idle. Gracz prowadzi mini-fabrykę soków z owocó
     3. Else jeśli `(x+1, y-1)` pusta → przesuń skos w prawo.
     4. Else zostaje.
   - Parzyste tikki sprawdzają najpierw lewy skos, nieparzyste prawy (eliminacja biasu).
-- **Spawn owoców**: tick co `1/FruitSpawnRateHz` (default 2Hz). Losowa kolumna z aktualnie odblokowanymi typami, losowy typ. Owoc trafia w top row tej kolumny.
-- **Top cap**: kolumna pełna do góry → spawn dla niej pomijany do zwolnienia (zero fail state).
+- **Spawn owoców — batch refill na przycisk**, nie continuous:
+  - Gracz tappuje "Refill Wall" button (UI w HUD).
+  - Wszystkie ciężarówki w tym czasie wstrzymują się (`IsRefilling = true` flaga konsumowana przez systemy ciężarówek; w Plan #2 brak ciężarówek, flaga gotowa do odpinki w Plan #3).
+  - Każdy tick refilla (`1/RefillTickRateHz`, default 30Hz) spawnuje `RefillSpawnsPerTick` (default ~100) owoców w losowych pustych komórkach top row z puli odblokowanych typów; sand-physics co tick przesuwa stos w dół, zwalniając miejsce w top row.
+  - Refill kończy się gdy każda komórka zajęta — flaga `IsRefilling = false`.
+- **Wskaźniki:** brak top cap / fail state — refill po prostu kończy się gdy grid pełen. Gracz uruchamia kolejny refill kiedy ściana zostanie wystarczająco opróżniona przez ciężarówki.
 
 ### 3.2 Sloty pod ścianą (3 aktywne, parallel)
 
@@ -393,10 +398,12 @@ Wszystkie wartości definiowane w `GameBalanceSO` (jeden asset):
 
 | Parametr | Wartość |
 |----------|---------|
-| `WallColumns` | 1000 |
-| `WallRows` | 1000 |
+| `WallColumns` | 300 |
+| `WallRows` | 300 |
+| `CellSizeWorldUnits` | 0.05 |
 | `GravityRateHz` | 10 |
-| `FruitSpawnRateHz` | 2 |
+| `RefillTickRateHz` | 30 |
+| `RefillSpawnsPerTick` | 100 |
 | `MagnetRateHz` | 5 |
 | `MagnetAnimDurationSec` | 0.3 |
 | `ConveyorSlotCount` | 4 |
