@@ -13,10 +13,12 @@ namespace Project.Tests.EditMode
             var balance = ScriptableObject.CreateInstance<GameBalanceSO>();
             balance.ResetToDefaults();
 
-            Assert.AreEqual(1000, balance.WallColumns);
-            Assert.AreEqual(1000, balance.WallRows);
+            Assert.AreEqual(300, balance.WallColumns);
+            Assert.AreEqual(300, balance.WallRows);
+            Assert.AreEqual(0.05f, balance.CellSizeWorldUnits);
             Assert.AreEqual(10f, balance.GravityRateHz);
-            Assert.AreEqual(2f, balance.FruitSpawnRateHz);
+            Assert.AreEqual(30f, balance.RefillTickRateHz);
+            Assert.AreEqual(100, balance.RefillSpawnsPerTick);
             Assert.AreEqual(5f, balance.MagnetRateHz);
             Assert.AreEqual(4, balance.ConveyorSlotCount);
             Assert.AreEqual(100, balance.TruckCapacity);
