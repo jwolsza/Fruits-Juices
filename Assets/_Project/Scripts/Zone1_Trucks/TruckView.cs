@@ -9,8 +9,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] Renderer boxRenderer;
         [Tooltip("Pivot, którego Y-scale rośnie z Load/Capacity (0..1). Box renderer powinien być jego dzieckiem.")]
         [SerializeField] Transform boxPivot;
-        [Tooltip("Opcjonalny TextMeshPro 3D — wyświetla procent napełnienia trucka (np. \"75%\").")]
-        [SerializeField] TextMeshPro fillPercentText;
+        [Tooltip("Opcjonalny TMP label (TextMeshPro 3D albo TextMeshProUGUI) — wyświetla procent napełnienia trucka (np. \"75%\").")]
+        [SerializeField] TMP_Text fillPercentText;
 
         Truck truck;
         ConveyorTrack track;
