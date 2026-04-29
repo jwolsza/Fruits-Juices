@@ -53,6 +53,7 @@ namespace Project.Zone1.Trucks
         readonly List<Truck> trucks = new();
         readonly Dictionary<int, TruckView> truckViews = new();
         readonly List<int> waitingDispatchQueue = new();
+        int nextTruckId = 1;
 
         float magnetAccumulator;
         int magnetTickIndex;
@@ -85,22 +86,37 @@ namespace Project.Zone1.Trucks
             conveyorView.Build(track.Waypoints);
             garage = new Garage();
 
-            int idCounter = 1;
             foreach (var fruit in balance.StartingFruitTypes)
-            {
-                var truck = new Truck(idCounter++, fruit, balance.TruckCapacity);
-                garage.AddStarterTruck(truck);
-                trucks.Add(truck);
-
-                var go = Instantiate(truckViewPrefab, transform);
-                go.name = $"TruckView_{fruit}";
-                var view = go.GetComponent<TruckView>();
-                Vector3 parkPos = garageView.GetParkPositionFor(truck.Id);
-                view.Bind(truck, track, parkPos);
-                garageView.RegisterTruckView(truck.Id, view);
-                truckViews[truck.Id] = view;
-            }
+                AddTruck(fruit);
         }
+
+        public bool AddTruck(FruitType type)
+        {
+            if (garageView == null || track == null) return false;
+            if (garage.TruckCount >= garageView.MaxParkingSlots) return false;
+
+            var truck = new Truck(nextTruckId++, type, balance.TruckCapacity);
+            garage.AddStarterTruck(truck);
+            trucks.Add(truck);
+
+            var go = Instantiate(truckViewPrefab, transform);
+            go.name = $"TruckView_{type}_{truck.Id}";
+            var view = go.GetComponent<TruckView>();
+            Vector3 parkPos = garageView.GetParkPositionFor(truck.Id);
+            view.Bind(truck, track, parkPos);
+            garageView.RegisterTruckView(truck.Id, view);
+            truckViews[truck.Id] = view;
+            return true;
+        }
+
+        public int GetTruckCount(FruitType type)
+        {
+            int count = 0;
+            foreach (var t in trucks) if (t.FruitColor == type) count++;
+            return count;
+        }
+
+        public bool CanAddTruck() => garageView != null && garage != null && garage.TruckCount < garageView.MaxParkingSlots;
 
         void Update()
         {

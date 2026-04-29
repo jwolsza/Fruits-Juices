@@ -18,6 +18,8 @@ namespace Project.Zone1.Trucks
         [Tooltip("Maksymalna liczba unikalnych parking pozycji. Powyżej — trucki stackują na ostatniej.")]
         [SerializeField] int maxParkingSlots = 10;
 
+        public int MaxParkingSlots => maxParkingSlots;
+
         readonly Dictionary<int, TruckView> truckViewsById = new();
         readonly List<int> orderedTruckIds = new();
 
