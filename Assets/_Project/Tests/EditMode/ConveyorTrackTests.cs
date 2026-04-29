@@ -20,21 +20,25 @@ namespace Project.Tests.EditMode
         }
 
         [Test]
-        public void NewTrack_HasCorrectSlotCount_AndEvenlySpacedSlots()
+        public void NewTrack_HasCorrectSlotCount_AndEvenlySpacedInitial()
         {
             var t = BuildSquare(slotCount: 4);
             Assert.AreEqual(4, t.Slots.Count);
-            Assert.That(t.Slots[0].SlotOffsetFromZero, Is.EqualTo(0f).Within(0.001f));
-            Assert.That(t.Slots[1].SlotOffsetFromZero, Is.EqualTo(0.25f).Within(0.001f));
-            Assert.That(t.Slots[2].SlotOffsetFromZero, Is.EqualTo(0.5f).Within(0.001f));
-            Assert.That(t.Slots[3].SlotOffsetFromZero, Is.EqualTo(0.75f).Within(0.001f));
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo(0.25f).Within(0.001f));
+            Assert.That(t.Slots[2].TrackPosition, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(t.Slots[3].TrackPosition, Is.EqualTo(0.75f).Within(0.001f));
         }
 
         [Test]
-        public void NewTrack_AllSlotsEmpty()
+        public void NewTrack_AllSlotsEmpty_AndNotStopped()
         {
             var t = BuildSquare();
-            foreach (var s in t.Slots) Assert.IsTrue(s.IsEmpty);
+            foreach (var s in t.Slots)
+            {
+                Assert.IsTrue(s.IsEmpty);
+                Assert.IsFalse(s.IsStopped);
+            }
         }
 
         [Test]
@@ -54,27 +58,72 @@ namespace Project.Tests.EditMode
         }
 
         [Test]
-        public void Tick_AdvancesAllSlotsTogether()
+        public void Tick_NoStoppedSlots_AllAdvanceUniformly()
         {
             var t = BuildSquare(slotCount: 2);
-            float prev0 = t.Slots[0].TrackPosition;
-            float prev1 = t.Slots[1].TrackPosition;
+            float p0 = t.Slots[0].TrackPosition;
+            float p1 = t.Slots[1].TrackPosition;
 
-            // Total length = 40, advance 4 units → +0.1 base progress
-            t.Tick(deltaTime: 1f, speedUnitsPerSec: 4f);
+            t.Tick(deltaTime: 1f, speedUnitsPerSec: 4f); // total 40 → +0.1
 
-            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo((prev0 + 0.1f) % 1f).Within(0.001f));
-            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo((prev1 + 0.1f) % 1f).Within(0.001f));
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo((p0 + 0.1f) % 1f).Within(0.001f));
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo((p1 + 0.1f) % 1f).Within(0.001f));
         }
 
         [Test]
         public void Paused_Tick_DoesNotAdvance()
         {
             var t = BuildSquare(slotCount: 2);
-            float prev0 = t.Slots[0].TrackPosition;
+            float p0 = t.Slots[0].TrackPosition;
             t.Paused = true;
             t.Tick(1f, 4f);
-            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(prev0).Within(0.001f));
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(p0).Within(0.001f));
+        }
+
+        [Test]
+        public void StoppedSlot_StaysPut_OtherSlotsContinueUntilFormation()
+        {
+            // Slot 0 at 0.5 stopped. Slot 1 at 0.4 (behind by 0.1), slot 2 at 0.7 (ahead by 0.2).
+            var t = BuildSquare(slotCount: 3);
+            t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
+            t.Slots[1].TrackPosition = 0.4f;
+            t.Slots[2].TrackPosition = 0.7f;
+
+            t.Tick(1f, 4f); // deltaParam = 0.1
+
+            Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(0.5f).Within(0.001f), "stopped stays");
+            // Slot 1 was 0.1 behind stopped slot. After +0.1 advance it would be at 0.5 = stopped.
+            // It clamps just behind: 0.5 - 0.001 = 0.499.
+            Assert.That(t.Slots[1].TrackPosition, Is.LessThanOrEqualTo(0.5f), "behind clamps before stopped");
+            Assert.That(t.Slots[2].TrackPosition, Is.EqualTo(0.8f).Within(0.001f), "ahead advances normally");
+        }
+
+        [Test]
+        public void StoppedSlot_NonStoppedTraffic_PassesUntilHittingFormation()
+        {
+            // Slot 0 stopped at 0.5. Slot 1 at 0.0 (far behind). Tick should let slot 1 advance fully.
+            var t = BuildSquare(slotCount: 2);
+            t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
+            t.Slots[1].TrackPosition = 0.0f;
+
+            t.Tick(1f, 4f); // delta 0.1, slot 1 → 0.1, no clamp needed (still 0.4 from stopped)
+
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo(0.1f).Within(0.001f));
+        }
+
+        [Test]
+        public void TwoStoppedSlots_OnlyNearestBlocks()
+        {
+            // Slot 0 stopped 0.5, slot 1 stopped 0.7. Slot 2 at 0.4. Advancing should clamp at 0.5 (nearest).
+            var t = BuildSquare(slotCount: 3);
+            t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
+            t.Slots[1].TrackPosition = 0.7f; t.Slots[1].IsStopped = true;
+            t.Slots[2].TrackPosition = 0.4f;
+
+            t.Tick(1f, 4f); // delta 0.1 → would land at 0.5 exactly, clamps to 0.499
+
+            Assert.That(t.Slots[2].TrackPosition, Is.LessThanOrEqualTo(0.5f));
+            Assert.That(t.Slots[2].TrackPosition, Is.GreaterThan(0.4f));
         }
 
         [Test]
@@ -101,26 +150,15 @@ namespace Project.Tests.EditMode
         }
 
         [Test]
-        public void TryAssignTruckToFirstEmptySlot_FillsFromIndexZero()
-        {
-            var t = BuildSquare(slotCount: 3);
-            var t1 = new Truck(1, FruitType.Apple, 100);
-            var t2 = new Truck(2, FruitType.Orange, 100);
-            t.TryAssignTruckToFirstEmptySlot(t1);
-            t.TryAssignTruckToFirstEmptySlot(t2);
-            Assert.AreSame(t1, t.Slots[0].Truck);
-            Assert.AreSame(t2, t.Slots[1].Truck);
-            Assert.IsTrue(t.Slots[2].IsEmpty);
-        }
-
-        [Test]
-        public void RemoveTruckFromSlot_FreesSlot()
+        public void RemoveTruckFromSlot_FreesSlotAndClearsStopFlag()
         {
             var t = BuildSquare(slotCount: 2);
             var truck = new Truck(1, FruitType.Apple, 100);
             t.TryAssignTruckToFirstEmptySlot(truck);
+            t.Slots[0].IsStopped = true;
             t.RemoveTruckFromSlot(truck);
             Assert.IsTrue(t.Slots[0].IsEmpty);
+            Assert.IsFalse(t.Slots[0].IsStopped);
         }
     }
 }

@@ -10,12 +10,13 @@ namespace Project.Zone1.Trucks
         readonly float totalLength;
         readonly List<ConveyorSlot> slots;
 
-        float baseProgress;
         bool paused;
 
         public IReadOnlyList<ConveyorWaypoint> Waypoints => waypoints;
         public IReadOnlyList<ConveyorSlot> Slots => slots;
         public float TotalLength => totalLength;
+
+        /// <summary>Global pause (np. refill na ścianie). Per-slot stop oparty na ConveyorSlot.IsStopped.</summary>
         public bool Paused
         {
             get => paused;
@@ -63,21 +64,40 @@ namespace Project.Zone1.Trucks
             return waypoints[0].Position;
         }
 
+        /// <summary>
+        /// Advance slots independently. A slot with IsStopped=true stays put; non-stopped slots
+        /// advance by deltaParam but cannot pass within a stopped slot in front (formation pile-up).
+        /// </summary>
         public void Tick(float deltaTime, float speedUnitsPerSec)
         {
             if (paused || totalLength <= 0f) return;
             float deltaParam = (speedUnitsPerSec * deltaTime) / totalLength;
-            baseProgress = ((baseProgress + deltaParam) % 1f + 1f) % 1f;
+
+            var stoppedPositions = new List<float>();
+            foreach (var s in slots)
+                if (s.IsStopped) stoppedPositions.Add(s.TrackPosition);
+
             foreach (var slot in slots)
             {
-                slot.TrackPosition = (baseProgress + slot.SlotOffsetFromZero) % 1f;
+                if (slot.IsStopped) continue;
+
+                float current = slot.TrackPosition;
+                float desired = current + deltaParam;
+
+                float minBlocker = float.PositiveInfinity;
+                foreach (float sp in stoppedPositions)
+                {
+                    float distAhead = (sp - current + 1f) % 1f;
+                    if (distAhead > 0f && distAhead < minBlocker) minBlocker = distAhead;
+                }
+                if (minBlocker < float.PositiveInfinity && deltaParam >= minBlocker)
+                    desired = current + minBlocker - 0.001f;
+
+                slot.TrackPosition = ((desired % 1f) + 1f) % 1f;
                 if (slot.Truck != null) slot.Truck.TrackPosition = slot.TrackPosition;
             }
         }
 
-        /// <summary>
-        /// Find first empty slot and place truck inside it. Returns true on success.
-        /// </summary>
         public bool TryAssignTruckToFirstEmptySlot(Truck truck)
         {
             foreach (var slot in slots)
@@ -97,7 +117,12 @@ namespace Project.Zone1.Trucks
         {
             foreach (var slot in slots)
             {
-                if (slot.Truck == truck) { slot.Truck = null; return; }
+                if (slot.Truck == truck)
+                {
+                    slot.Truck = null;
+                    slot.IsStopped = false;
+                    return;
+                }
             }
         }
 

@@ -85,10 +85,10 @@ namespace Project.Zone1.Trucks
 
             HandleTapDispatch();
 
-            // Determine pause state: refilling OR a truck-bearing slot is at the stop slot AND can collect.
-            bool shouldPause = isRefilling || ShouldPauseConveyorForCollection();
-            track.Paused = shouldPause;
+            // Global pause = refill only. Per-slot stops handled below.
+            track.Paused = isRefilling;
 
+            UpdateSlotStopStates();
             track.Tick(dt, truckSpeedUnitsPerSec);
 
             float magnetInterval = 1f / Mathf.Max(0.01f, balance.MagnetRateHz);
@@ -121,24 +121,32 @@ namespace Project.Zone1.Trucks
             track.TryAssignTruckToFirstEmptySlot(truck);
         }
 
-        bool ShouldPauseConveyorForCollection()
+        void UpdateSlotStopStates()
         {
             int stopSlotIdx = -1;
             for (int i = 0; i < wallSlots.Count; i++)
                 if (wallSlots[i].IsStopSlot) { stopSlotIdx = i; break; }
-            if (stopSlotIdx < 0) return false;
+            if (stopSlotIdx < 0)
+            {
+                foreach (var slot in track.Slots) slot.IsStopped = false;
+                return;
+            }
 
             float stopParam = ApproximateTrackParamForWorldPos(wallSlots[stopSlotIdx].WorldPosition);
             const float stopWindow = 0.02f;
 
             foreach (var slot in track.Slots)
             {
-                if (slot.IsEmpty) continue;
+                if (slot.IsEmpty)
+                {
+                    slot.IsStopped = false;
+                    continue;
+                }
                 float dist = Mathf.Abs(((slot.TrackPosition - stopParam) + 1f) % 1f);
                 dist = Mathf.Min(dist, 1f - dist);
-                if (dist <= stopWindow && CanTruckStillCollect(slot.Truck)) return true;
+                bool atStopPos = dist <= stopWindow;
+                slot.IsStopped = atStopPos && CanTruckStillCollect(slot.Truck);
             }
-            return false;
         }
 
         bool CanTruckStillCollect(Truck truck)
