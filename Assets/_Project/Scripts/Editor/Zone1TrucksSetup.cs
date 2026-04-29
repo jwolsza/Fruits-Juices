@@ -96,6 +96,91 @@ namespace Project.Editor
                 "Press Play to test.", "OK");
         }
 
+        // Indexes of LineRenderer points that should be active slots.
+        // Last one in this list is the "stop slot" (truck pauses here to collect).
+        static readonly int[] ActiveSlotPointIndexes = { 4, 5, 6 };
+
+        [MenuItem("Tools/Project/Sync Conveyor Waypoints From LineRenderer")]
+        public static void SyncWaypointsFromLineRenderer()
+        {
+            var firstZone = GameObject.Find("FirstZone");
+            if (firstZone == null) { ErrorAndExit("FirstZone not found"); return; }
+
+            var zone1Trucks = firstZone.transform.Find("[Zone1Trucks]");
+            if (zone1Trucks == null) { ErrorAndExit("[Zone1Trucks] not found"); return; }
+
+            var manager = zone1Trucks.GetComponent<Zone1TrucksManager>();
+            if (manager == null) { ErrorAndExit("Zone1TrucksManager missing"); return; }
+
+            var conveyor = zone1Trucks.Find("Conveyor");
+            if (conveyor == null) { ErrorAndExit("Conveyor GameObject missing"); return; }
+
+            var lr = conveyor.GetComponent<LineRenderer>();
+            if (lr == null) { ErrorAndExit("LineRenderer missing on Conveyor"); return; }
+
+            int count = lr.positionCount;
+            if (count < 2) { ErrorAndExit($"LineRenderer has only {count} points; need at least 2"); return; }
+
+            var positions = new Vector3[count];
+            lr.GetPositions(positions);
+
+            if (!lr.useWorldSpace)
+            {
+                for (int i = 0; i < count; i++)
+                    positions[i] = conveyor.TransformPoint(positions[i]);
+            }
+
+            var so = new SerializedObject(manager);
+
+            // Conveyor waypoints
+            var waypointsProp = so.FindProperty("conveyorWaypoints");
+            waypointsProp.arraySize = count;
+            for (int i = 0; i < count; i++)
+            {
+                bool isActive = false;
+                int slotIdx = -1;
+                for (int s = 0; s < ActiveSlotPointIndexes.Length; s++)
+                {
+                    if (ActiveSlotPointIndexes[s] == i)
+                    {
+                        isActive = true;
+                        slotIdx = s;
+                        break;
+                    }
+                }
+
+                var elem = waypointsProp.GetArrayElementAtIndex(i);
+                elem.FindPropertyRelative("Position").vector3Value = positions[i];
+                elem.FindPropertyRelative("IsActiveSlot").boolValue = isActive;
+                elem.FindPropertyRelative("SlotIndex").intValue = slotIdx;
+            }
+
+            // Wall slots — sync to the same positions, last one IsStopSlot=true.
+            var wallSlotsProp = so.FindProperty("wallSlots");
+            wallSlotsProp.arraySize = ActiveSlotPointIndexes.Length;
+            for (int s = 0; s < ActiveSlotPointIndexes.Length; s++)
+            {
+                int pointIdx = ActiveSlotPointIndexes[s];
+                if (pointIdx < 0 || pointIdx >= count) continue;
+                bool isStop = (s == ActiveSlotPointIndexes.Length - 1);
+                var elem = wallSlotsProp.GetArrayElementAtIndex(s);
+                elem.FindPropertyRelative("WorldPosition").vector3Value = positions[pointIdx];
+                elem.FindPropertyRelative("SlotIndex").intValue = s;
+                elem.FindPropertyRelative("IsStopSlot").boolValue = isStop;
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(manager);
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(manager.gameObject.scene);
+
+            EditorUtility.DisplayDialog("Sync Conveyor Waypoints",
+                $"Synced {count} waypoints from LineRenderer.\n" +
+                $"Active slots set at LineRenderer indexes [{string.Join(", ", ActiveSlotPointIndexes)}].\n" +
+                $"Wall slots updated to {ActiveSlotPointIndexes.Length} positions; " +
+                $"last one (idx {ActiveSlotPointIndexes[^1]}) marked IsStopSlot=true.\n\n" +
+                "Click Save Scene (Cmd+S) when satisfied.", "OK");
+        }
+
         static GameObject CreateTruckPrefab(Material boxMat)
         {
             var root = new GameObject("TruckPrefab");
