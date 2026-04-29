@@ -9,7 +9,10 @@ namespace Project.Data
         [Header("Wall (sand-physics grid)")]
         public int WallColumns = 300;
         public int WallRows = 300;
-        public float CellSizeWorldUnits = 0.05f;
+        [Tooltip("Total wall width in world units. Cell width = WallWidthWorldUnits / WallColumns.")]
+        public float WallWidthWorldUnits = 5f;
+        [Tooltip("Total wall height in world units. Cell height = WallHeightWorldUnits / WallRows.")]
+        public float WallHeightWorldUnits = 5f;
         public float GravityRateHz = 10f;
 
         [Header("Wall refill")]
@@ -56,7 +59,8 @@ namespace Project.Data
         {
             WallColumns = 300;
             WallRows = 300;
-            CellSizeWorldUnits = 0.05f;
+            WallWidthWorldUnits = 5f;
+            WallHeightWorldUnits = 5f;
             GravityRateHz = 10f;
 
             RefillTickRateHz = 30f;

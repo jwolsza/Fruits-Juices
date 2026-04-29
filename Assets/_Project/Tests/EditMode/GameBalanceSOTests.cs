@@ -15,7 +15,8 @@ namespace Project.Tests.EditMode
 
             Assert.AreEqual(300, balance.WallColumns);
             Assert.AreEqual(300, balance.WallRows);
-            Assert.AreEqual(0.05f, balance.CellSizeWorldUnits);
+            Assert.AreEqual(5f, balance.WallWidthWorldUnits);
+            Assert.AreEqual(5f, balance.WallHeightWorldUnits);
             Assert.AreEqual(10f, balance.GravityRateHz);
             Assert.AreEqual(30f, balance.RefillTickRateHz);
             Assert.AreEqual(100, balance.RefillSpawnsPerTick);

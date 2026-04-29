@@ -13,11 +13,14 @@ namespace Project.Zone1.FruitWall
         SpriteRenderer[,] cellRenderers;
         Color[,] lastColors;
 
-        public void Initialize(FruitGrid grid, float cellSize)
+        public void Initialize(FruitGrid grid, float wallWidth, float wallHeight)
         {
             this.grid = grid;
             cellRenderers = new SpriteRenderer[grid.Columns, grid.Rows];
             lastColors = new Color[grid.Columns, grid.Rows];
+
+            float cellWidth = wallWidth / grid.Columns;
+            float cellHeight = wallHeight / grid.Rows;
 
             for (int x = 0; x < grid.Columns; x++)
             {
@@ -26,10 +29,10 @@ namespace Project.Zone1.FruitWall
                     var go = new GameObject($"Cell_{x}_{y}");
                     go.transform.SetParent(transform, worldPositionStays: false);
                     go.transform.localPosition = new Vector3(
-                        x * cellSize + cellSize * 0.5f,
-                        y * cellSize + cellSize * 0.5f,
+                        x * cellWidth + cellWidth * 0.5f,
+                        y * cellHeight + cellHeight * 0.5f,
                         0f);
-                    go.transform.localScale = Vector3.one * cellSize;
+                    go.transform.localScale = new Vector3(cellWidth, cellHeight, 1f);
 
                     var sr = go.AddComponent<SpriteRenderer>();
                     sr.sprite = cellSprite;
