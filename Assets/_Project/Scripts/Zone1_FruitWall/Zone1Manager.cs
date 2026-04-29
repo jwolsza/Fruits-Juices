@@ -44,7 +44,7 @@ namespace Project.Zone1.FruitWall
                 rng,
                 balance.RefillSpawnsPerTick);
 
-            wallView.Initialize(grid);
+            wallView.Initialize(grid, balance.CellSizeWorldUnits);
         }
 
         void Update()

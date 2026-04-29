@@ -6,7 +6,6 @@ namespace Project.Zone1.FruitWall
     {
         [Header("Visual")]
         [SerializeField] Sprite cellSprite;
-        [SerializeField] float cellSize = 0.05f;
         [SerializeField] string sortingLayerName = "Default";
         [SerializeField] int sortingOrderBase = 0;
 
@@ -14,7 +13,7 @@ namespace Project.Zone1.FruitWall
         SpriteRenderer[,] cellRenderers;
         Color[,] lastColors;
 
-        public void Initialize(FruitGrid grid)
+        public void Initialize(FruitGrid grid, float cellSize)
         {
             this.grid = grid;
             cellRenderers = new SpriteRenderer[grid.Columns, grid.Rows];
