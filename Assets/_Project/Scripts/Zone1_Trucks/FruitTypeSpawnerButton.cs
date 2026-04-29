@@ -18,6 +18,13 @@ namespace Project.Zone1.Trucks
 
         Button button;
 
+        public void Configure(FruitType newType, Zone1TrucksManager newManager)
+        {
+            type = newType;
+            manager = newManager;
+            if (label == null) label = GetComponentInChildren<TMP_Text>(includeInactive: true);
+        }
+
         void Awake()
         {
             button = GetComponent<Button>();
