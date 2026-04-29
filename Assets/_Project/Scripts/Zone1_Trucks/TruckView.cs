@@ -6,6 +6,8 @@ namespace Project.Zone1.Trucks
     public class TruckView : MonoBehaviour
     {
         [SerializeField] Renderer boxRenderer;
+        [Tooltip("Pivot, którego Y-scale rośnie z Load/Capacity (0..1). Box renderer powinien być jego dzieckiem.")]
+        [SerializeField] Transform boxPivot;
 
         Truck truck;
         ConveyorTrack track;
@@ -22,6 +24,15 @@ namespace Project.Zone1.Trucks
 
         public void SetGaragePosition(Vector3 pos) => garageParkPosition = pos;
 
+        void UpdateBoxFillScale()
+        {
+            if (boxPivot == null || truck.Capacity <= 0) return;
+            float fill = Mathf.Clamp01((float)truck.Load / truck.Capacity);
+            var s = boxPivot.localScale;
+            s.y = fill;
+            boxPivot.localScale = s;
+        }
+
         void ApplyColor()
         {
             if (boxRenderer == null) return;
@@ -36,6 +47,9 @@ namespace Project.Zone1.Trucks
         void LateUpdate()
         {
             if (truck == null) return;
+
+            UpdateBoxFillScale();
+
             switch (truck.State)
             {
                 case TruckState.InGarage:
