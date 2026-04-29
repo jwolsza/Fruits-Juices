@@ -185,12 +185,13 @@ namespace Project.Zone1.Trucks
             if (flyingFruitPool != null && wallView != null)
             {
                 Vector2 cellSize = wallView.GetCellWorldSize();
+                Quaternion wallRot = wallView.transform.rotation;
                 foreach (var a in assignments)
                 {
                     Vector3 from = wallView.GetCellWorldPosition(a.GridCellRemoved.x, a.GridCellRemoved.y);
                     if (truckViews.TryGetValue(a.Truck.Id, out var view) && view != null)
                     {
-                        flyingFruitPool.Fly(view.transform, from, a.FruitType, cellSize);
+                        flyingFruitPool.Fly(view.transform, from, wallRot, a.FruitType, cellSize);
                     }
                 }
             }

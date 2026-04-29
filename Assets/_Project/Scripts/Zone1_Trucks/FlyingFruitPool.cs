@@ -43,15 +43,13 @@ namespace Project.Zone1.Trucks
             }
         }
 
-        public void Fly(Transform target, Vector3 fromWorld, FruitType type, Vector2 sizeWorld)
+        public void Fly(Transform target, Vector3 fromWorld, Quaternion worldRot, FruitType type, Vector2 sizeWorld)
         {
             if (available.Count == 0 || target == null) return;
             var view = available.Dequeue();
             view.gameObject.SetActive(true);
 
-            // Parent najpierw, potem ustaw localScale dzieląc przez parent lossyScale,
-            // żeby finalny world size = sizeWorld * sizeMultiplier (niezależny od target scale).
-            view.Begin(target, fromWorld, arcHeightWorld, flyDurationSec);
+            view.Begin(target, fromWorld, worldRot, arcHeightWorld, flyDurationSec);
             Vector3 lossy = target.lossyScale;
             float sx = lossy.x != 0f ? sizeWorld.x * sizeMultiplier / lossy.x : sizeWorld.x * sizeMultiplier;
             float sy = lossy.y != 0f ? sizeWorld.y * sizeMultiplier / lossy.y : sizeWorld.y * sizeMultiplier;

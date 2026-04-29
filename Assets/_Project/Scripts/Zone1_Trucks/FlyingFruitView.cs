@@ -14,6 +14,7 @@ namespace Project.Zone1.Trucks
         public Action<FlyingFruitView> OnFlightDone;
 
         Vector3 startLocal;
+        Quaternion worldRotation;
         float arcHeight;
         float duration;
         float elapsed;
@@ -24,11 +25,13 @@ namespace Project.Zone1.Trucks
             SpriteRenderer = GetComponent<SpriteRenderer>();
         }
 
-        public void Begin(Transform target, Vector3 fromWorld, float arcHeightWorld, float durationSec)
+        public void Begin(Transform target, Vector3 fromWorld, Quaternion worldRot, float arcHeightWorld, float durationSec)
         {
             transform.SetParent(target, worldPositionStays: false);
             startLocal = target.InverseTransformPoint(fromWorld);
             transform.localPosition = startLocal;
+            worldRotation = worldRot;
+            transform.rotation = worldRotation;
             arcHeight = arcHeightWorld;
             duration = Mathf.Max(0.01f, durationSec);
             elapsed = 0f;
@@ -44,6 +47,7 @@ namespace Project.Zone1.Trucks
             Vector3 linear = Vector3.Lerp(startLocal, Vector3.zero, t);
             float arc = Mathf.Sin(t * Mathf.PI) * arcHeight;
             transform.localPosition = new Vector3(linear.x, linear.y + arc, linear.z);
+            transform.rotation = worldRotation;
 
             if (t >= 1f)
             {
