@@ -38,6 +38,7 @@ namespace Project.Zone1.Trucks
         readonly Dictionary<int, TruckView> truckViews = new();
 
         float magnetAccumulator;
+        int magnetTickIndex;
         bool isRefilling;
 
         void OnEnable()
@@ -174,7 +175,8 @@ namespace Project.Zone1.Trucks
                 if (nearest != null) activeTrucks.Add(nearest);
             }
 
-            MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucks);
+            MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucks, magnetTickIndex);
+            magnetTickIndex++;
         }
 
         Truck FindTruckAtConveyorSlotNear(Vector3 wallSlotWorldPos)

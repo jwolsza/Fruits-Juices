@@ -23,16 +23,22 @@ namespace Project.Zone1.Trucks
         /// </summary>
         public static List<MagnetAssignment> AssignFruitsToTrucksAtSlots(
             FruitGrid grid,
-            IReadOnlyList<Truck> activeTrucks)
+            IReadOnlyList<Truck> activeTrucks,
+            int tickIndex)
         {
             var result = new List<MagnetAssignment>();
             if (grid == null || activeTrucks == null || activeTrucks.Count == 0) return result;
+
+            bool ltr = (tickIndex % 2) == 0;
+            int start = ltr ? 0 : grid.Columns - 1;
+            int end = ltr ? grid.Columns : -1;
+            int step = ltr ? 1 : -1;
 
             foreach (var truck in activeTrucks)
             {
                 if (truck.IsFull) continue;
 
-                for (int x = 0; x < grid.Columns; x++)
+                for (int x = start; x != end; x += step)
                 {
                     var cell = grid.GetCell(x, 0);
                     if (!cell.HasValue) continue;
