@@ -5,6 +5,7 @@
         "Project.Core",
         "Project.Data",
         "Project.Input",
+        "Project.Zone1.FruitWall",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Unity.InputSystem",
