@@ -85,6 +85,7 @@ namespace Project.Tests.EditMode
         {
             // Slot 0 at 0.5 stopped. Slot 1 at 0.4 (behind by 0.1), slot 2 at 0.7 (ahead by 0.2).
             var t = BuildSquare(slotCount: 3);
+            t.MinSlotSpacing = 0.05f;
             t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
             t.Slots[1].TrackPosition = 0.4f;
             t.Slots[2].TrackPosition = 0.7f;
@@ -92,10 +93,24 @@ namespace Project.Tests.EditMode
             t.Tick(1f, 4f); // deltaParam = 0.1
 
             Assert.That(t.Slots[0].TrackPosition, Is.EqualTo(0.5f).Within(0.001f), "stopped stays");
-            // Slot 1 was 0.1 behind stopped slot. After +0.1 advance it would be at 0.5 = stopped.
-            // It clamps just behind: 0.5 - 0.001 = 0.499.
-            Assert.That(t.Slots[1].TrackPosition, Is.LessThanOrEqualTo(0.5f), "behind clamps before stopped");
+            // Slot 1 was 0.1 behind stopped (gap 0.1). MinSpacing 0.05 → can advance up to 0.45.
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo(0.45f).Within(0.001f), "behind clamps to maintain min gap");
             Assert.That(t.Slots[2].TrackPosition, Is.EqualTo(0.8f).Within(0.001f), "ahead advances normally");
+        }
+
+        [Test]
+        public void MinSlotSpacing_PreventsOverlap()
+        {
+            // Slot 0 stopped at 0.5. Slot 1 at 0.49 (already too close given min spacing 0.05).
+            var t = BuildSquare(slotCount: 2);
+            t.MinSlotSpacing = 0.05f;
+            t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
+            t.Slots[1].TrackPosition = 0.49f;
+
+            t.Tick(1f, 4f);
+
+            // Slot 1 was already inside MinSpacing zone — should not move forward at all.
+            Assert.That(t.Slots[1].TrackPosition, Is.EqualTo(0.49f).Within(0.001f));
         }
 
         [Test]
@@ -114,16 +129,16 @@ namespace Project.Tests.EditMode
         [Test]
         public void TwoStoppedSlots_OnlyNearestBlocks()
         {
-            // Slot 0 stopped 0.5, slot 1 stopped 0.7. Slot 2 at 0.4. Advancing should clamp at 0.5 (nearest).
+            // Slot 0 stopped 0.5, slot 1 stopped 0.7. Slot 2 at 0.4. Advancing should clamp behind nearest (0.5).
             var t = BuildSquare(slotCount: 3);
+            t.MinSlotSpacing = 0.05f;
             t.Slots[0].TrackPosition = 0.5f; t.Slots[0].IsStopped = true;
             t.Slots[1].TrackPosition = 0.7f; t.Slots[1].IsStopped = true;
             t.Slots[2].TrackPosition = 0.4f;
 
-            t.Tick(1f, 4f); // delta 0.1 → would land at 0.5 exactly, clamps to 0.499
+            t.Tick(1f, 4f); // delta 0.1, gap to nearest stopped (0.5) = 0.1, allowed = 0.05 → clamp to 0.45
 
-            Assert.That(t.Slots[2].TrackPosition, Is.LessThanOrEqualTo(0.5f));
-            Assert.That(t.Slots[2].TrackPosition, Is.GreaterThan(0.4f));
+            Assert.That(t.Slots[2].TrackPosition, Is.EqualTo(0.45f).Within(0.001f));
         }
 
         [Test]

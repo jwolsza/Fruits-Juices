@@ -11,6 +11,7 @@ namespace Project.Zone1.Trucks
         readonly List<ConveyorSlot> slots;
 
         bool paused;
+        float minSlotSpacing = 0.05f;
 
         public IReadOnlyList<ConveyorWaypoint> Waypoints => waypoints;
         public IReadOnlyList<ConveyorSlot> Slots => slots;
@@ -21,6 +22,13 @@ namespace Project.Zone1.Trucks
         {
             get => paused;
             set => paused = value;
+        }
+
+        /// <summary>Minimalny dystans w track-param (0..1) jaki sloty muszą zachować między sobą.</summary>
+        public float MinSlotSpacing
+        {
+            get => minSlotSpacing;
+            set => minSlotSpacing = Mathf.Max(0f, value);
         }
 
         public ConveyorTrack(IList<ConveyorWaypoint> waypoints, int slotCount)
@@ -90,8 +98,12 @@ namespace Project.Zone1.Trucks
                     float distAhead = (sp - current + 1f) % 1f;
                     if (distAhead > 0f && distAhead < minBlocker) minBlocker = distAhead;
                 }
-                if (minBlocker < float.PositiveInfinity && deltaParam >= minBlocker)
-                    desired = current + minBlocker - 0.001f;
+                if (minBlocker < float.PositiveInfinity)
+                {
+                    float maxAdvance = Mathf.Max(0f, minBlocker - minSlotSpacing);
+                    float allowed = current + maxAdvance;
+                    if (desired > allowed) desired = allowed;
+                }
 
                 slot.TrackPosition = ((desired % 1f) + 1f) % 1f;
                 if (slot.Truck != null) slot.Truck.TrackPosition = slot.TrackPosition;

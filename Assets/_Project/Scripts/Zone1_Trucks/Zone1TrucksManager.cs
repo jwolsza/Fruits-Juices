@@ -19,6 +19,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] ConveyorView conveyorView;
         [Tooltip("World units per second.")]
         [SerializeField] float truckSpeedUnitsPerSec = 1.5f;
+        [Tooltip("Minimum gap (track-param 0..1) between slots — prevents stacking when piling up behind a stopped slot.")]
+        [SerializeField] float minSlotSpacing = 0.05f;
 
         [Header("Wall slots (active spots)")]
         [SerializeField] List<WallSlot> wallSlots;
@@ -59,6 +61,7 @@ namespace Project.Zone1.Trucks
             }
 
             track = new ConveyorTrack(conveyorWaypoints, balance.ConveyorSlotCount);
+            track.MinSlotSpacing = minSlotSpacing;
             conveyorView.Build(track.Waypoints);
             garage = new Garage();
 
