@@ -13,8 +13,8 @@ namespace Project.Tests.EditMode
             var balance = ScriptableObject.CreateInstance<GameBalanceSO>();
             balance.ResetToDefaults();
 
-            Assert.AreEqual(300, balance.WallColumns);
-            Assert.AreEqual(300, balance.WallRows);
+            Assert.AreEqual(42, balance.WallColumns);
+            Assert.AreEqual(42, balance.WallRows);
             Assert.AreEqual(5f, balance.WallWidthWorldUnits);
             Assert.AreEqual(5f, balance.WallHeightWorldUnits);
             Assert.AreEqual(10f, balance.GravityRateHz);

@@ -7,8 +7,8 @@ namespace Project.Data
     public class GameBalanceSO : ScriptableObject
     {
         [Header("Wall (sand-physics grid)")]
-        public int WallColumns = 300;
-        public int WallRows = 300;
+        public int WallColumns = 42;
+        public int WallRows = 42;
         [Tooltip("Total wall width in world units. Cell width = WallWidthWorldUnits / WallColumns.")]
         public float WallWidthWorldUnits = 5f;
         [Tooltip("Total wall height in world units. Cell height = WallHeightWorldUnits / WallRows.")]
@@ -57,8 +57,8 @@ namespace Project.Data
 
         public void ResetToDefaults()
         {
-            WallColumns = 300;
-            WallRows = 300;
+            WallColumns = 42;
+            WallRows = 42;
             WallWidthWorldUnits = 5f;
             WallHeightWorldUnits = 5f;
             GravityRateHz = 10f;

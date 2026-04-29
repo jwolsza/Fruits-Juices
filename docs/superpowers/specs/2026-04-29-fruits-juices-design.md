@@ -398,8 +398,8 @@ Wszystkie wartości definiowane w `GameBalanceSO` (jeden asset):
 
 | Parametr | Wartość |
 |----------|---------|
-| `WallColumns` | 300 |
-| `WallRows` | 300 |
+| `WallColumns` | 42 |
+| `WallRows` | 42 |
 | `WallWidthWorldUnits` | 5 |
 | `WallHeightWorldUnits` | 5 |
 | `GravityRateHz` | 10 |
