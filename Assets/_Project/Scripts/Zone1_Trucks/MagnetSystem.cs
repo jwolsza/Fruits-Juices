@@ -14,54 +14,42 @@ namespace Project.Zone1.Trucks
 
     public static class MagnetSystem
     {
+        /// <summary>
+        /// Każdy truck w activeTrucks (czyli truck zaparkowany przy aktywnym wall slocie) ma
+        /// "magnet" na CAŁĄ bottom row ściany — pozycja jego slotu nie ogranicza zasięgu.
+        /// Per call (1 magnet tick) każdy truck zabiera 1 najbliższy lewostronnie pasujący owoc
+        /// (z indexu 0 wzwyż). Trucki tego samego koloru dzielą się owocami (każdy bierze po 1
+        /// na tick, w kolejności activeTrucks).
+        /// </summary>
         public static List<MagnetAssignment> AssignFruitsToTrucksAtSlots(
             FruitGrid grid,
-            IReadOnlyList<(Truck truck, float slotWorldX)> trucksAtSlots,
-            float wallLeftXWorld,
-            float wallWidthWorld)
+            IReadOnlyList<Truck> activeTrucks)
         {
             var result = new List<MagnetAssignment>();
-            if (grid == null || trucksAtSlots == null || trucksAtSlots.Count == 0) return result;
-            if (grid.Columns <= 0) return result;
+            if (grid == null || activeTrucks == null || activeTrucks.Count == 0) return result;
 
-            float cellWidthWorld = wallWidthWorld / grid.Columns;
-
-            var available = new List<(int cellX, FruitType type)>();
-            for (int x = 0; x < grid.Columns; x++)
-            {
-                var c = grid.GetCell(x, 0);
-                if (c.HasValue) available.Add((x, c.Value));
-            }
-
-            foreach (var (truck, slotX) in trucksAtSlots)
+            foreach (var truck in activeTrucks)
             {
                 if (truck.IsFull) continue;
 
-                int bestIdx = -1;
-                float bestDist = float.PositiveInfinity;
-                for (int i = 0; i < available.Count; i++)
+                for (int x = 0; x < grid.Columns; x++)
                 {
-                    var (cellX, type) = available[i];
-                    if (type != truck.FruitColor) continue;
-                    float worldX = wallLeftXWorld + cellX * cellWidthWorld + cellWidthWorld * 0.5f;
-                    float d = Mathf.Abs(worldX - slotX);
-                    if (d < bestDist) { bestDist = d; bestIdx = i; }
-                }
+                    var cell = grid.GetCell(x, 0);
+                    if (!cell.HasValue) continue;
+                    if (cell.Value != truck.FruitColor) continue;
 
-                if (bestIdx >= 0)
-                {
-                    var (cellX, type) = available[bestIdx];
-                    grid.ClearCell(cellX, 0);
+                    grid.ClearCell(x, 0);
                     truck.AddFruit();
-                    available.RemoveAt(bestIdx);
                     result.Add(new MagnetAssignment
                     {
                         Truck = truck,
-                        GridCellRemoved = new Vector2Int(cellX, 0),
-                        FruitType = type,
+                        GridCellRemoved = new Vector2Int(x, 0),
+                        FruitType = cell.Value,
                     });
+                    break;
                 }
             }
+
             return result;
         }
     }

@@ -8,18 +8,18 @@ namespace Project.Tests.EditMode
     public class MagnetSystemTests
     {
         [Test]
-        public void Magnet_WithMatchingFruitInBottomRow_RemovesFromGridAndIncrementsLoad()
+        public void Magnet_TruckPicksAnyMatchingFruit_RegardlessOfPosition()
         {
             var grid = new FruitGrid(10, 10);
-            grid.SetCell(5, 0, FruitType.Apple);
-            var truck = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
+            // Apple far on the right — should still be collected by truck.
+            grid.SetCell(8, 0, FruitType.Apple);
+            var truck = new Truck(1, FruitType.Apple, 100);
 
-            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid, new[] { (truck, 0f) }, wallLeftXWorld: 0f, wallWidthWorld: 10f);
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, new[] { truck });
 
             Assert.AreEqual(1, assignments.Count);
             Assert.AreEqual(1, truck.Load);
-            Assert.IsNull(grid.GetCell(5, 0));
+            Assert.IsNull(grid.GetCell(8, 0));
         }
 
         [Test]
@@ -27,9 +27,10 @@ namespace Project.Tests.EditMode
         {
             var grid = new FruitGrid(10, 10);
             grid.SetCell(5, 0, FruitType.Orange);
-            var truck = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
-            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid, new[] { (truck, 0f) }, 0f, 10f);
+            var truck = new Truck(1, FruitType.Apple, 100);
+
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, new[] { truck });
+
             Assert.AreEqual(0, assignments.Count);
             Assert.AreEqual(0, truck.Load);
         }
@@ -39,41 +40,69 @@ namespace Project.Tests.EditMode
         {
             var grid = new FruitGrid(10, 10);
             grid.SetCell(5, 0, FruitType.Apple);
-            var truck = new Truck(1, FruitType.Apple, 1) { State = TruckState.StoppedAtSlot };
+            var truck = new Truck(1, FruitType.Apple, 1);
             truck.AddFruit();
-            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid, new[] { (truck, 0f) }, 0f, 10f);
+
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, new[] { truck });
+
             Assert.AreEqual(0, assignments.Count);
         }
 
         [Test]
-        public void Magnet_MultipleTrucks_AssignsClosestFruitPerTruckByX()
+        public void Magnet_MultipleTrucksDifferentColors_EachGetsOwnColor()
+        {
+            var grid = new FruitGrid(10, 10);
+            grid.SetCell(2, 0, FruitType.Apple);
+            grid.SetCell(7, 0, FruitType.Orange);
+
+            var truckApple = new Truck(1, FruitType.Apple, 100);
+            var truckOrange = new Truck(2, FruitType.Orange, 100);
+
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
+                grid, new[] { truckApple, truckOrange });
+
+            Assert.AreEqual(2, assignments.Count);
+            Assert.AreEqual(1, truckApple.Load);
+            Assert.AreEqual(1, truckOrange.Load);
+            Assert.IsTrue(grid.IsCellEmpty(2, 0));
+            Assert.IsTrue(grid.IsCellEmpty(7, 0));
+        }
+
+        [Test]
+        public void Magnet_TwoTrucksSameColor_ShareFruits_OnePerTruckPerTick()
         {
             var grid = new FruitGrid(10, 10);
             grid.SetCell(2, 0, FruitType.Apple);
             grid.SetCell(8, 0, FruitType.Apple);
-            var truckLeft = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
-            var truckRight = new Truck(2, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
-            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid, new[] { (truckLeft, 2f), (truckRight, 8f) }, 0f, 10f);
+
+            var t1 = new Truck(1, FruitType.Apple, 100);
+            var t2 = new Truck(2, FruitType.Apple, 100);
+
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, new[] { t1, t2 });
+
+            // First truck takes leftmost (x=2), second takes next leftmost (x=8).
             Assert.AreEqual(2, assignments.Count);
-            Assert.AreEqual(1, truckLeft.Load);
-            Assert.AreEqual(1, truckRight.Load);
+            Assert.AreEqual(1, t1.Load);
+            Assert.AreEqual(1, t2.Load);
+            Assert.IsTrue(grid.IsCellEmpty(2, 0));
+            Assert.IsTrue(grid.IsCellEmpty(8, 0));
         }
 
         [Test]
-        public void Magnet_TwoTrucksSameColor_SecondGetsNextNearest()
+        public void Magnet_TruckTakesLeftmostMatchingFruit()
         {
             var grid = new FruitGrid(10, 10);
-            grid.SetCell(4, 0, FruitType.Apple);
-            grid.SetCell(6, 0, FruitType.Apple);
-            var a = new Truck(1, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
-            var b = new Truck(2, FruitType.Apple, 100) { State = TruckState.StoppedAtSlot };
-            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid, new[] { (a, 5f), (b, 5f) }, 0f, 10f);
-            Assert.AreEqual(2, assignments.Count);
-            Assert.AreEqual(1, a.Load);
-            Assert.AreEqual(1, b.Load);
+            grid.SetCell(3, 0, FruitType.Apple);
+            grid.SetCell(7, 0, FruitType.Apple);
+
+            var truck = new Truck(1, FruitType.Apple, 100);
+
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, new[] { truck });
+
+            Assert.AreEqual(1, assignments.Count);
+            Assert.AreEqual(new UnityEngine.Vector2Int(3, 0), assignments[0].GridCellRemoved);
+            Assert.IsTrue(grid.IsCellEmpty(3, 0));
+            Assert.IsFalse(grid.IsCellEmpty(7, 0), "rightmost stays for next tick");
         }
     }
 }

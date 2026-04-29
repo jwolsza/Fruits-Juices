@@ -167,17 +167,14 @@ namespace Project.Zone1.Trucks
             var grid = zone1Manager.Grid;
             if (grid == null) return;
 
-            var trucksAtSlots = new List<(Truck, float)>();
+            var activeTrucks = new List<Truck>();
             foreach (var wallSlot in wallSlots)
             {
                 Truck nearest = FindTruckAtConveyorSlotNear(wallSlot.WorldPosition);
-                if (nearest != null) trucksAtSlots.Add((nearest, wallSlot.WorldPosition.x));
+                if (nearest != null) activeTrucks.Add(nearest);
             }
 
-            MagnetSystem.AssignFruitsToTrucksAtSlots(
-                grid, trucksAtSlots,
-                wallLeftXWorld: zone1Manager.WallLeftXWorld,
-                wallWidthWorld: zone1Manager.WallWidthWorldUnits);
+            MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucks);
         }
 
         Truck FindTruckAtConveyorSlotNear(Vector3 wallSlotWorldPos)
