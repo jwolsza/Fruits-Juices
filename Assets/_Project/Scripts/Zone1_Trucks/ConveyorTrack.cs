@@ -31,6 +31,35 @@ namespace Project.Zone1.Trucks
             set => minSlotSpacing = Mathf.Max(0f, value);
         }
 
+        public static float ComputeTotalLength(IList<ConveyorWaypoint> waypoints)
+        {
+            float total = 0f;
+            int n = waypoints.Count;
+            for (int i = 0; i < n; i++)
+            {
+                int next = (i + 1) % n;
+                total += Vector3.Distance(waypoints[i].Position, waypoints[next].Position);
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Creates a track where slot count is computed from physical dimensions:
+        /// slotCount = floor(trackLength / (truckLength + gap)), MinSlotSpacing = truckLength / trackLength.
+        /// </summary>
+        public static ConveyorTrack CreateWithDynamicSlots(
+            IList<ConveyorWaypoint> waypoints,
+            float truckLengthWorld,
+            float gapBetweenTrucksWorld)
+        {
+            float total = ComputeTotalLength(waypoints);
+            float perSlot = Mathf.Max(0.0001f, truckLengthWorld + gapBetweenTrucksWorld);
+            int count = Mathf.Max(1, Mathf.FloorToInt(total / perSlot));
+            var track = new ConveyorTrack(waypoints, count);
+            if (total > 0f) track.MinSlotSpacing = truckLengthWorld / total;
+            return track;
+        }
+
         public ConveyorTrack(IList<ConveyorWaypoint> waypoints, int slotCount)
         {
             this.waypoints = new List<ConveyorWaypoint>(waypoints);
