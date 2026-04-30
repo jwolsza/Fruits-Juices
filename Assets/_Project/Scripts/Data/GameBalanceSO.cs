@@ -43,16 +43,23 @@ namespace Project.Data
         public int CoinsPerCustomerBase = 10;
 
         [Header("Fruits")]
+        [Tooltip("Typy dostępne do kupienia w garażu od początku gry (przyciski w UI).")]
         public FruitType[] StartingFruitTypes = new[]
         {
-            FruitType.Apple,
+            FruitType.Apple, FruitType.Orange, FruitType.Lemon,
         };
 
+        [Tooltip("Typy odblokowywane stopniowo przez wall upgrade (level N → +N typów z tej listy).")]
         public FruitType[] LockedFruitTypes = new[]
         {
-            FruitType.Orange, FruitType.Lemon,
             FruitType.Strawberry, FruitType.Grape, FruitType.Banana,
             FruitType.Kiwi, FruitType.Pineapple, FruitType.Watermelon, FruitType.Mango,
+        };
+
+        [Tooltip("Typy ciężarówek spawnowanych automatycznie przy starcie (gracz dostaje je za darmo).")]
+        public FruitType[] InitialTruckTypes = new[]
+        {
+            FruitType.Apple,
         };
 
         public void ResetToDefaults()
@@ -85,13 +92,13 @@ namespace Project.Data
             CustomerSpawnRateHz = 0.25f;
             CoinsPerCustomerBase = 10;
 
-            StartingFruitTypes = new[] { FruitType.Apple };
+            StartingFruitTypes = new[] { FruitType.Apple, FruitType.Orange, FruitType.Lemon };
             LockedFruitTypes = new[]
             {
-                FruitType.Orange, FruitType.Lemon,
                 FruitType.Strawberry, FruitType.Grape, FruitType.Banana,
                 FruitType.Kiwi, FruitType.Pineapple, FruitType.Watermelon, FruitType.Mango,
             };
+            InitialTruckTypes = new[] { FruitType.Apple };
         }
     }
 }

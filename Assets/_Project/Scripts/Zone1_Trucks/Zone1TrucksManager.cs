@@ -101,8 +101,9 @@ namespace Project.Zone1.Trucks
             conveyorView.Build(track.Waypoints);
             garage = new Garage();
 
-            foreach (var fruit in balance.StartingFruitTypes)
-                AddTruck(fruit);
+            var initialTypes = balance.InitialTruckTypes ?? balance.StartingFruitTypes;
+            if (initialTypes != null)
+                foreach (var fruit in initialTypes) AddTruck(fruit);
         }
 
         public bool AddTruck(FruitType type)

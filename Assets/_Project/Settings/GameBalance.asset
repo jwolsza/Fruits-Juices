@@ -34,5 +34,6 @@ MonoBehaviour:
   CustomerQueueLength: 5
   CustomerSpawnRateHz: 0.25
   CoinsPerCustomerBase: 10
-  StartingFruitTypes: 00000000
-  LockedFruitTypes: 01000000020000000a0000000b0000000c0000000d0000000e0000000f00000010000000
+  StartingFruitTypes: 000000000100000002000000
+  LockedFruitTypes: 0a0000000b0000000c0000000d0000000e0000000f00000010000000
+  InitialTruckTypes: 00000000

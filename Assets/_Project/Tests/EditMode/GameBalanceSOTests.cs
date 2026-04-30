@@ -37,8 +37,11 @@ namespace Project.Tests.EditMode
             Assert.AreEqual(10, balance.CoinsPerCustomerBase);
 
             CollectionAssert.AreEqual(
-                new[] { FruitType.Apple },
+                new[] { FruitType.Apple, FruitType.Orange, FruitType.Lemon },
                 balance.StartingFruitTypes);
+            CollectionAssert.AreEqual(
+                new[] { FruitType.Apple },
+                balance.InitialTruckTypes);
         }
     }
 }

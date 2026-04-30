@@ -56,8 +56,8 @@ namespace Project.Zone1.Trucks
         {
             if (manager == null) return;
             bool atLimit = manager.GetTruckCount(type) >= 1;
-            if (label != null)
-                label.text = atLimit ? "Buy Truck\n(Limit Reached)" : "Buy Truck";
+            string status = atLimit ? "Limit Reached" : "Buy Truck";
+            if (label != null) label.text = $"{type}\n({status})";
             if (button != null) button.interactable = manager.CanAddTruckOfType(type);
         }
     }
