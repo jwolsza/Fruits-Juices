@@ -69,6 +69,7 @@ namespace Project.Zone1.Trucks
         readonly Dictionary<int, TruckView> truckViews = new();
         readonly List<int> waitingDispatchQueue = new();
         readonly Dictionary<int, BigBottle> truckTargetBottles = new();
+        readonly Dictionary<int, int> truckCurrentReservedAmount = new();
         readonly Dictionary<int, float> truckDumpEmitAccumulator = new();
         int nextTruckId = 1;
 
@@ -369,8 +370,9 @@ namespace Project.Zone1.Trucks
 
                 // Try to route to a compatible bottle. If no Zone2 or no compatible bottle —
                 // fall back to direct return to garage (placeholder behavior).
+                int reserved = 0;
                 BigBottle bottle = zone2Manager != null
-                    ? zone2Manager.TryReserveTruckBottle(truck.FruitColor, truck.Load)
+                    ? zone2Manager.TryReserveTruckBottle(truck.FruitColor, truck.Load, out reserved)
                     : null;
 
                 track.RemoveTruckFromSlot(truck);
@@ -381,6 +383,7 @@ namespace Project.Zone1.Trucks
                     truck.State = TruckState.DrivingToBottle;
                     truck.DumpTargetWorldPos = zone2Manager.GetBottleWorldPosition(bottle);
                     truckTargetBottles[truck.Id] = bottle;
+                    truckCurrentReservedAmount[truck.Id] = reserved;
                 }
                 else
                 {
@@ -390,6 +393,20 @@ namespace Project.Zone1.Trucks
                         view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
                 }
             }
+        }
+
+        bool TryRouteRemainingLoad(Truck truck)
+        {
+            if (zone2Manager == null || truck.Load <= 0) return false;
+            int reserved = 0;
+            var bottle = zone2Manager.TryReserveTruckBottle(truck.FruitColor, truck.Load, out reserved);
+            if (bottle == null) return false;
+            truck.State = TruckState.DrivingToBottle;
+            truck.DumpTargetWorldPos = zone2Manager.GetBottleWorldPosition(bottle);
+            truckTargetBottles[truck.Id] = bottle;
+            truckCurrentReservedAmount[truck.Id] = reserved;
+            truckDumpEmitAccumulator.Remove(truck.Id);
+            return true;
         }
 
         void ProcessBottleRouting(float dt)
@@ -414,16 +431,16 @@ namespace Project.Zone1.Trucks
                         continue;
                     }
 
-                    if (truck.Load > 0)
+                    int currentReserved = truckCurrentReservedAmount.GetValueOrDefault(truck.Id, 0);
+                    if (truck.Load > 0 && currentReserved > 0)
                     {
                         float accum = truckDumpEmitAccumulator.GetValueOrDefault(truck.Id, 0f) + dumpRateFruitsPerSec * dt;
-                        int emit = Mathf.Min((int)accum, truck.Load);
+                        int emit = Mathf.Min((int)accum, Mathf.Min(truck.Load, currentReserved));
                         accum -= emit;
                         truckDumpEmitAccumulator[truck.Id] = accum;
 
                         if (emit > 0)
                         {
-                            // Visual: spawn N flying fruits truck → bottle.
                             if (flyingFruitPool != null && truckViews.TryGetValue(truck.Id, out var view) && view != null && zone2Manager != null)
                             {
                                 var bottleTransform = zone2Manager.GetBottleTransform(bottle);
@@ -437,20 +454,31 @@ namespace Project.Zone1.Trucks
                                             dumpFruitSize);
                             }
 
-                            // Data: deposit incrementally + decrement truck load (truck visually shrinks).
                             if (zone2Manager != null) zone2Manager.Deposit(bottle, truck.FruitColor, emit);
                             truck.RemoveFruits(emit);
+                            currentReserved -= emit;
+                            truckCurrentReservedAmount[truck.Id] = currentReserved;
                         }
                     }
 
-                    if (truck.Load <= 0)
+                    // Reservation depleted? Reroute remaining load OR return.
+                    if (currentReserved <= 0)
                     {
-                        truck.EmptyLoad();
-                        truck.State = TruckState.ReturningToGarage;
                         truckTargetBottles.Remove(truck.Id);
-                        truckDumpEmitAccumulator.Remove(truck.Id);
-                        if (truckViews.TryGetValue(truck.Id, out var v) && v != null)
-                            v.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                        truckCurrentReservedAmount.Remove(truck.Id);
+
+                        if (truck.Load > 0 && TryRouteRemainingLoad(truck))
+                        {
+                            // truck.State = DrivingToBottle, target updated; loop continues next frame.
+                        }
+                        else
+                        {
+                            truck.EmptyLoad();
+                            truck.State = TruckState.ReturningToGarage;
+                            truckDumpEmitAccumulator.Remove(truck.Id);
+                            if (truckViews.TryGetValue(truck.Id, out var v) && v != null)
+                                v.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                        }
                     }
                 }
                 else if (truck.State == TruckState.ReturningToGarage)

@@ -19,9 +19,10 @@ namespace Project.Zone2.Bottling
             foreach (var b in bottles)
             {
                 var effective = b.EffectiveType;
+                // Matching type with ANY free space — truck deposits as much as fits, then reroutes for rest.
                 if (effective.HasValue
                     && effective.Value == truckFruitColor
-                    && b.EffectiveLoad + truckLoad <= b.Capacity)
+                    && b.EffectiveLoad < b.Capacity)
                 {
                     return b;
                 }
