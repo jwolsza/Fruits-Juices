@@ -15,7 +15,6 @@ namespace Project.Zone2.Bottling
         [SerializeField] BigBottleView bottlePrefab;
         [SerializeField] SmallBottleRackView rackPrefab;
         [SerializeField] int bottleCount = 3;
-        [SerializeField] int maxBottles = 8;
         [Tooltip("Pozycja pierwszej butelki (local Zone2Manager).")]
         [SerializeField] Vector3 firstBottleOffset = Vector3.zero;
         [Tooltip("Krok offsetu w obrębie rzędu (zwykle X).")]
@@ -45,8 +44,17 @@ namespace Project.Zone2.Bottling
         public IReadOnlyList<BigBottle> Bottles => bottles;
         public IReadOnlyList<SmallBottleRack> Racks => racks;
         public int BottleCount => bottles.Count;
-        public int MaxBottles => maxBottles;
-        public bool CanAddBottle() => bottles.Count < maxBottles && bottlePrefab != null && rackPrefab != null;
+        public int MaxBottles
+        {
+            get
+            {
+                if (balance == null) return 0;
+                int starting = balance.StartingFruitTypes?.Length ?? 0;
+                int locked = balance.LockedFruitTypes?.Length ?? 0;
+                return starting + locked;
+            }
+        }
+        public bool CanAddBottle() => bottles.Count < MaxBottles && bottlePrefab != null && rackPrefab != null;
 
         void Start()
         {
