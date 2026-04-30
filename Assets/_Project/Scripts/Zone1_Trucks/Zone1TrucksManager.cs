@@ -20,6 +20,11 @@ namespace Project.Zone1.Trucks
         [SerializeField] ConveyorView conveyorView;
         [Tooltip("World units per second.")]
         [SerializeField] float truckSpeedUnitsPerSec = 1.5f;
+        public float TruckSpeedUnitsPerSec
+        {
+            get => truckSpeedUnitsPerSec;
+            set => truckSpeedUnitsPerSec = Mathf.Max(0f, value);
+        }
         [Tooltip("Wizualna długość pojedynczej ciężarówki na torze (world units). Używana do dynamic slot count.")]
         [SerializeField] float truckLengthWorldUnits = 1f;
         [Tooltip("Wymagany odstęp między ciężarówkami na torze (world units).")]

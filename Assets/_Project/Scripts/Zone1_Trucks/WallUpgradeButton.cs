@@ -27,10 +27,15 @@ namespace Project.Zone1.Trucks
         [Tooltip("Ile world units rozszerzyć conveyor (lewy bok -X, prawy bok +X) per upgrade level.")]
         [SerializeField] float trackXStepPerLevel = 0.3f;
 
+        [Header("Truck speed")]
+        [Tooltip("Bonus prędkości ciężarówek (world units/s) dodawany per level upgrade'u.")]
+        [SerializeField] float truckSpeedStepPerLevel = 0.2f;
+
         [SerializeField] TMP_Text label;
 
         Button button;
         int level;
+        float baseTruckSpeed;
 
         public int Level => level;
 
@@ -38,6 +43,7 @@ namespace Project.Zone1.Trucks
         {
             button = GetComponent<Button>();
             button.onClick.AddListener(Upgrade);
+            if (trucksManager != null) baseTruckSpeed = trucksManager.TruckSpeedUnitsPerSec;
             ApplyScaleAndTypes();
         }
 
@@ -47,7 +53,11 @@ namespace Project.Zone1.Trucks
             if (next > maxScale + 0.0001f) return;
             level++;
             ApplyScaleAndTypes();
-            if (trucksManager != null) trucksManager.ExpandTrack(trackXStepPerLevel);
+            if (trucksManager != null)
+            {
+                trucksManager.ExpandTrack(trackXStepPerLevel);
+                trucksManager.TruckSpeedUnitsPerSec = baseTruckSpeed + level * truckSpeedStepPerLevel;
+            }
         }
 
         void ApplyScaleAndTypes()
