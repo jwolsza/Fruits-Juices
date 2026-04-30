@@ -56,38 +56,16 @@ namespace Project.Editor
             var existingRacks = secondZone.transform.Find("Racks");
             if (existingRacks != null) Object.DestroyImmediate(existingRacks.gameObject);
 
-            // Bottles container
-            var bottlesRoot = new GameObject("Bottles");
-            bottlesRoot.transform.SetParent(secondZone.transform, false);
-            var bottleViews = new BigBottleView[3];
-            for (int i = 0; i < 3; i++)
-            {
-                var go = (GameObject)PrefabUtility.InstantiatePrefab(bigBottlePrefab, bottlesRoot.transform);
-                go.name = $"BigBottle{i}";
-                go.transform.localPosition = new Vector3((i - 1) * 0.8f, 0f, 0f);
-                bottleViews[i] = go.GetComponent<BigBottleView>();
-            }
+            // Build a SmallBottleRackView prefab variant so Zone2Manager can instantiate at runtime.
+            var rackPrefabAsset = BuildSmallBottleRackPrefab(smallBottlePrefab);
 
-            // Racks container
-            var racksRoot = new GameObject("Racks");
-            racksRoot.transform.SetParent(secondZone.transform, false);
-            var rackViews = new SmallBottleRackView[3];
-            for (int i = 0; i < 3; i++)
-            {
-                var rackGo = new GameObject($"Rack{i}");
-                rackGo.transform.SetParent(racksRoot.transform, false);
-                rackGo.transform.localPosition = new Vector3((i - 1) * 0.8f, 0f, 0.7f); // slightly forward toward zone3
-                var view = rackGo.AddComponent<SmallBottleRackView>();
-                ConfigureRackView(view, smallBottlePrefab, balance.RackCapacity);
-                rackViews[i] = view;
-            }
-
-            // [Zone2Manager]
+            // [Zone2Manager] only — bottles & racks spawned procedurally at runtime.
             var managerGo = new GameObject("[Zone2Manager]");
             managerGo.transform.SetParent(secondZone.transform, false);
             managerGo.transform.localPosition = Vector3.zero;
             var zone2Manager = managerGo.AddComponent<Zone2Manager>();
-            ConfigureZone2Manager(zone2Manager, balance, bottleViews, rackViews, mainCamera);
+            ConfigureZone2Manager(zone2Manager, balance, bigBottlePrefab.GetComponent<BigBottleView>(),
+                rackPrefabAsset.GetComponent<SmallBottleRackView>(), mainCamera);
 
             // Wire Zone1TrucksManager.zone2Manager
             var z1so = new SerializedObject(zone1TrucksManager);
@@ -171,8 +149,16 @@ namespace Project.Editor
             return prefab;
         }
 
-        static void ConfigureRackView(SmallBottleRackView view, GameObject smallBottlePrefab, int capacity)
+        const string SmallBottleRackPrefabPath = "Assets/_Project/Prefabs/SmallBottleRackPrefab.prefab";
+
+        static GameObject BuildSmallBottleRackPrefab(GameObject smallBottlePrefab)
         {
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(SmallBottleRackPrefabPath);
+            if (existing != null) return existing;
+
+            EnsurePrefabFolder();
+            var root = new GameObject("SmallBottleRackPrefab");
+            var view = root.AddComponent<SmallBottleRackView>();
             var so = new SerializedObject(view);
             so.FindProperty("smallBottleTemplate").objectReferenceValue = smallBottlePrefab;
             so.FindProperty("firstSlotOffset").vector3Value = new Vector3(-0.3f, 0f, 0f);
@@ -180,29 +166,29 @@ namespace Project.Editor
             so.FindProperty("stepY").vector3Value = new Vector3(0f, 0f, 0.12f);
             so.FindProperty("columns").intValue = 5;
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, SmallBottleRackPrefabPath);
+            Object.DestroyImmediate(root);
+            return prefab;
         }
 
         static void ConfigureZone2Manager(
             Zone2Manager manager,
             GameBalanceSO balance,
-            BigBottleView[] bottleViews,
-            SmallBottleRackView[] rackViews,
+            BigBottleView bottlePrefab,
+            SmallBottleRackView rackPrefab,
             Camera mainCamera)
         {
             var so = new SerializedObject(manager);
             so.FindProperty("balance").objectReferenceValue = balance;
+            so.FindProperty("bottlePrefab").objectReferenceValue = bottlePrefab;
+            so.FindProperty("rackPrefab").objectReferenceValue = rackPrefab;
+            so.FindProperty("bottleCount").intValue = 3;
+            so.FindProperty("firstBottleOffset").vector3Value = new Vector3(-0.8f, 0f, 0f);
+            so.FindProperty("bottleStepOffset").vector3Value = new Vector3(0.8f, 0f, 0f);
+            so.FindProperty("firstRackOffset").vector3Value = new Vector3(-0.8f, 0f, 0.7f);
+            so.FindProperty("rackStepOffset").vector3Value = new Vector3(0.8f, 0f, 0f);
             so.FindProperty("mainCamera").objectReferenceValue = mainCamera;
-
-            var bottleViewsProp = so.FindProperty("bottleViews");
-            bottleViewsProp.arraySize = bottleViews.Length;
-            for (int i = 0; i < bottleViews.Length; i++)
-                bottleViewsProp.GetArrayElementAtIndex(i).objectReferenceValue = bottleViews[i];
-
-            var rackViewsProp = so.FindProperty("rackViews");
-            rackViewsProp.arraySize = rackViews.Length;
-            for (int i = 0; i < rackViews.Length; i++)
-                rackViewsProp.GetArrayElementAtIndex(i).objectReferenceValue = rackViews[i];
-
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

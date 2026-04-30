@@ -11,39 +11,58 @@ namespace Project.Zone2.Bottling
         [Header("Config")]
         [SerializeField] GameBalanceSO balance;
 
-        [Header("Bottles + racks (parallel arrays — index i: bottle i + rack i)")]
-        [SerializeField] BigBottleView[] bottleViews;
-        [SerializeField] SmallBottleRackView[] rackViews;
+        [Header("Procedural spawn")]
+        [SerializeField] BigBottleView bottlePrefab;
+        [SerializeField] SmallBottleRackView rackPrefab;
+        [SerializeField] int bottleCount = 3;
+        [Tooltip("Pozycja pierwszej butelki (local Zone2Manager).")]
+        [SerializeField] Vector3 firstBottleOffset = Vector3.zero;
+        [Tooltip("Krok offsetu między butelkami.")]
+        [SerializeField] Vector3 bottleStepOffset = new(1f, 0f, 0f);
+        [Tooltip("Pozycja pierwszego racka (local Zone2Manager).")]
+        [SerializeField] Vector3 firstRackOffset = new(0f, 0f, 0.7f);
+        [Tooltip("Krok offsetu między rackami.")]
+        [SerializeField] Vector3 rackStepOffset = new(1f, 0f, 0f);
 
         [Header("Camera (tap raycast)")]
         [SerializeField] Camera mainCamera;
 
         readonly List<BigBottle> bottles = new();
         readonly List<SmallBottleRack> racks = new();
+        readonly List<BigBottleView> bottleViews = new();
+        readonly List<SmallBottleRackView> rackViews = new();
 
         public IReadOnlyList<BigBottle> Bottles => bottles;
         public IReadOnlyList<SmallBottleRack> Racks => racks;
 
         void Start()
         {
-            if (balance == null || bottleViews == null || rackViews == null) return;
-            int n = Mathf.Min(bottleViews.Length, rackViews.Length);
-            for (int i = 0; i < n; i++)
+            if (balance == null || bottlePrefab == null || rackPrefab == null)
             {
-                var b = new BigBottle(i, balance.BigBottleCapacity);
-                bottles.Add(b);
-                if (bottleViews[i] != null) bottleViews[i].Bind(b);
+                Debug.LogError("[Zone2Manager] missing references (balance/bottlePrefab/rackPrefab)");
+                return;
+            }
 
-                var r = new SmallBottleRack(i, balance.RackCapacity);
-                racks.Add(r);
-                if (rackViews[i] != null) rackViews[i].Bind(r);
+            for (int i = 0; i < bottleCount; i++)
+            {
+                var bottleView = Instantiate(bottlePrefab, transform);
+                bottleView.name = $"BigBottle{i}";
+                bottleView.transform.localPosition = firstBottleOffset + i * bottleStepOffset;
+                var bottle = new BigBottle(i, balance.BigBottleCapacity);
+                bottles.Add(bottle);
+                bottleView.Bind(bottle);
+                bottleViews.Add(bottleView);
+
+                var rackView = Instantiate(rackPrefab, transform);
+                rackView.name = $"Rack{i}";
+                rackView.transform.localPosition = firstRackOffset + i * rackStepOffset;
+                var rack = new SmallBottleRack(i, balance.RackCapacity);
+                racks.Add(rack);
+                rackView.Bind(rack);
+                rackViews.Add(rackView);
             }
         }
 
-        /// <summary>
-        /// Route + reserve in one shot. If no bottle available or reservation fails, returns null.
-        /// Caller (Zone1TrucksManager) should call Deposit on arrival to commit the reservation.
-        /// </summary>
         public BigBottle TryReserveTruckBottle(FruitType truckFruitColor, int truckLoad)
         {
             var bottle = BigBottleRouter.FindBottleFor(truckFruitColor, truckLoad, bottles);
@@ -55,7 +74,7 @@ namespace Project.Zone2.Bottling
         {
             if (bottle == null) return Vector3.zero;
             int idx = bottles.IndexOf(bottle);
-            if (idx < 0 || idx >= bottleViews.Length || bottleViews[idx] == null) return Vector3.zero;
+            if (idx < 0 || idx >= bottleViews.Count || bottleViews[idx] == null) return Vector3.zero;
             return bottleViews[idx].DumpAnchorWorldPosition;
         }
 
@@ -90,7 +109,7 @@ namespace Project.Zone2.Bottling
             {
                 var view = hit.collider.GetComponentInParent<BigBottleView>();
                 if (view == null) return;
-                int idx = System.Array.IndexOf(bottleViews, view);
+                int idx = bottleViews.IndexOf(view);
                 if (idx < 0 || idx >= bottles.Count) return;
                 PourController.Pour(bottles[idx], racks[idx], balance.FruitsPerSmallBottle);
             }
