@@ -132,6 +132,33 @@ namespace Project.Zone1.Trucks
 
         public bool CanAddTruck() => garageView != null && garage != null && garage.TruckCount < garageView.MaxParkingSlots;
 
+        /// <summary>
+        /// Expands (or contracts) the conveyor by moving waypoints by `step` on X.
+        /// Indexes 1,2,3,4 → -X (left side). Indexes 0,6,7,8 → +X (right side). Index 5 stays fixed.
+        /// Slots keep their normalized track positions so they auto-adjust.
+        /// </summary>
+        public void ExpandTrack(float xStep)
+        {
+            if (track == null || conveyorWaypoints == null || conveyorWaypoints.Count == 0) return;
+
+            for (int i = 0; i < conveyorWaypoints.Count; i++)
+            {
+                if (i == 5) continue;
+                var wp = conveyorWaypoints[i];
+                bool leftSide = (i >= 1 && i <= 4);
+                wp.Position += new Vector3(leftSide ? -xStep : xStep, 0f, 0f);
+                conveyorWaypoints[i] = wp;
+            }
+
+            track.RebuildFromWaypoints(conveyorWaypoints);
+
+            // Recompute MinSlotSpacing relative to new totalLength.
+            if (track.TotalLength > 0f)
+                track.MinSlotSpacing = truckLengthWorldUnits / track.TotalLength;
+
+            conveyorView?.Build(track.Waypoints);
+        }
+
         void Update()
         {
             float dt = Time.deltaTime;
