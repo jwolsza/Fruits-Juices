@@ -16,9 +16,11 @@ namespace Project.Input
         [Tooltip("Tarcie/drag dla inercji po puszczeniu palca (jednostek/s²).")]
         [SerializeField] float drag = 5f;
 
-        [Header("Player Zone Detection (screen-based)")]
-        [Tooltip("Tap na ekranie z X >= screenWidth × ta wartość (0..1) → joystick. Inaczej → scroll kamerą. 0.5 = prawa połowa = joystick.")]
-        [SerializeField] float playerZoneMinScreenXPercent = 0.5f;
+        [Header("Player Zone Detection (world raycast)")]
+        [Tooltip("Tap z rayem trafiającym w world X >= ta wartość = joystick. Inaczej = scroll kamerą.")]
+        [SerializeField] float playerZoneMinWorldX = 18f;
+        [Tooltip("Y płaszczyzny ground dla raycastu klasyfikującego.")]
+        [SerializeField] float groundPlaneY = 0f;
 
         [Header("Joystick")]
         [SerializeField] float joystickMaxRadiusPx = 100f;
@@ -46,7 +48,7 @@ namespace Project.Input
                 minX, maxX, pixelsToWorld, rubberStrength, snapBackSpeed, drag, startX);
 
             router = new InputRouter(
-                classify: ClassifyByScreenSide,
+                classify: ClassifyByGroundRaycast,
                 tapDistanceThresholdPx: tapDistancePx,
                 tapTimeThresholdSec: tapTimeSec,
                 onJoystickPress: p => joystick.OnPress(p),
@@ -57,10 +59,14 @@ namespace Project.Input
                 onTap: HandleTap);
         }
 
-        ScreenArea ClassifyByScreenSide(Vector2 screenPos)
+        ScreenArea ClassifyByGroundRaycast(Vector2 screenPos)
         {
-            float threshold = Screen.width * Mathf.Clamp01(playerZoneMinScreenXPercent);
-            return screenPos.x >= threshold ? ScreenArea.Joystick : ScreenArea.Scroll;
+            if (mainCamera == null) return ScreenArea.Scroll;
+            Plane ground = new Plane(Vector3.up, new Vector3(0f, groundPlaneY, 0f));
+            Ray ray = mainCamera.ScreenPointToRay(screenPos);
+            if (!ground.Raycast(ray, out float distance)) return ScreenArea.Scroll;
+            Vector3 hit = ray.GetPoint(distance);
+            return hit.x >= playerZoneMinWorldX ? ScreenArea.Joystick : ScreenArea.Scroll;
         }
 
         void HandleTap(Vector2 screenPos)

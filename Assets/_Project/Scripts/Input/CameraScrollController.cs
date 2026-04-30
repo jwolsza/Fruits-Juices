@@ -64,6 +64,7 @@ namespace Project.Input
         public void OnRelease()
         {
             isDragging = false;
+            Velocity = 0f;
         }
 
         public void Update(float deltaTime)
