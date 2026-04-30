@@ -109,6 +109,7 @@ namespace Project.Zone1.Trucks
         {
             if (garageView == null || track == null) return false;
             if (garage.TruckCount >= garageView.MaxParkingSlots) return false;
+            if (GetTruckCount(type) >= 1) return false; // limit: 1 truck per type
 
             var truck = new Truck(nextTruckId++, type, balance.TruckCapacity);
             garage.AddStarterTruck(truck);
@@ -136,6 +137,8 @@ namespace Project.Zone1.Trucks
         }
 
         public bool CanAddTruck() => garageView != null && garage != null && garage.TruckCount < garageView.MaxParkingSlots;
+
+        public bool CanAddTruckOfType(FruitType type) => CanAddTruck() && GetTruckCount(type) < 1;
 
         /// <summary>
         /// Expands (or contracts) the conveyor by moving waypoints by `step` on X.

@@ -45,11 +45,12 @@ namespace Project.Data
         [Header("Fruits")]
         public FruitType[] StartingFruitTypes = new[]
         {
-            FruitType.Apple, FruitType.Orange, FruitType.Lemon,
+            FruitType.Apple,
         };
 
         public FruitType[] LockedFruitTypes = new[]
         {
+            FruitType.Orange, FruitType.Lemon,
             FruitType.Strawberry, FruitType.Grape, FruitType.Banana,
             FruitType.Kiwi, FruitType.Pineapple, FruitType.Watermelon, FruitType.Mango,
         };
@@ -84,9 +85,10 @@ namespace Project.Data
             CustomerSpawnRateHz = 0.25f;
             CoinsPerCustomerBase = 10;
 
-            StartingFruitTypes = new[] { FruitType.Apple, FruitType.Orange, FruitType.Lemon };
+            StartingFruitTypes = new[] { FruitType.Apple };
             LockedFruitTypes = new[]
             {
+                FruitType.Orange, FruitType.Lemon,
                 FruitType.Strawberry, FruitType.Grape, FruitType.Banana,
                 FruitType.Kiwi, FruitType.Pineapple, FruitType.Watermelon, FruitType.Mango,
             };
