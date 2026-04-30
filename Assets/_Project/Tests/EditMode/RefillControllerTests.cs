@@ -40,7 +40,7 @@ namespace Project.Tests.EditMode
         {
             var grid = new FruitGrid(5, 5);
             var ctrl = new RefillController(grid, DefaultPool(), new FakeRandom(), spawnsPerTick: 10);
-            ctrl.Start();
+            ctrl.Start(grid.Columns * grid.Rows);
             Assert.IsTrue(ctrl.IsRefilling);
         }
 
@@ -62,7 +62,7 @@ namespace Project.Tests.EditMode
 
             var random = new FakeRandom(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             var ctrl = new RefillController(grid, DefaultPool(), random, spawnsPerTick: 3);
-            ctrl.Start();
+            ctrl.Start(grid.Columns * grid.Rows);
 
             ctrl.Tick();
 
@@ -78,7 +78,7 @@ namespace Project.Tests.EditMode
             for (int x = 0; x < 3; x++) grid.SetCell(x, 2, FruitType.Apple);
 
             var ctrl = new RefillController(grid, DefaultPool(), new FakeRandom(0), spawnsPerTick: 5);
-            ctrl.Start();
+            ctrl.Start(grid.Columns * grid.Rows);
 
             int before = grid.OccupiedCount;
             ctrl.Tick();
@@ -94,7 +94,7 @@ namespace Project.Tests.EditMode
             grid.SetCell(1, 1, FruitType.Apple);
 
             var ctrl = new RefillController(grid, DefaultPool(), new FakeRandom(0, 0), spawnsPerTick: 5);
-            ctrl.Start();
+            ctrl.Start(grid.Columns * grid.Rows);
             ctrl.Tick();
 
             Assert.IsTrue(grid.IsFull);
@@ -107,7 +107,7 @@ namespace Project.Tests.EditMode
             var grid = new FruitGrid(3, 1);
             var random = new FakeRandom(0, 0, 0, 1, 0, 2);
             var ctrl = new RefillController(grid, DefaultPool(), random, spawnsPerTick: 3);
-            ctrl.Start();
+            ctrl.Start(grid.Columns * grid.Rows);
             ctrl.Tick();
 
             Assert.AreEqual(3, grid.OccupiedCount);

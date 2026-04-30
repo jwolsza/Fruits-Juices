@@ -16,24 +16,24 @@ MonoBehaviour:
   WallRows: 100
   WallWidthWorldUnits: 5
   WallHeightWorldUnits: 5
-  GravityRateHz: 30
+  GravityRateHz: 60
   RefillTickRateHz: 30
   RefillSpawnsPerTick: 100
-  MagnetRateHz: 30
-  ConveyorSlotCount: 4
+  MagnetRateHz: 60
   TruckCapacity: 300
-  BigBottleCapacity: 200
-  FruitsPerSmallBottle: 5
+  BigBottleCapacity: 1200
+  FruitsPerSmallBottle: 50
   RackCapacity: 30
   PourSpeed: 6
-  PlayerSpeed: 5
-  PlayerCapacity: 10
-  PickupRadius: 1.5
-  DeliverRadius: 1.5
-  PickupRateHz: 10
-  DeliverRateHz: 10
+  PlayerSpeed: 1.5
+  PlayerCapacity: 36
+  PickupRadius: 1
+  DeliverRadius: 1
+  PickupRateHz: 60
+  DeliverRateHz: 60
   CustomerQueueLength: 5
   CustomerSpawnRateHz: 0.25
-  CoinsPerCustomerBase: 10
+  CoinsPerCustomerBase: 2
   StartingFruitTypes: 000000000100000002000000
   LockedFruitTypes: 0a0000000b0000000c0000000d0000000e0000000f00000010000000
+  InitialTruckTypes: 00000000

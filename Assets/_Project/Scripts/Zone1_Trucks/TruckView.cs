@@ -15,6 +15,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] TMP_Text fillPercentText;
         [Tooltip("Szybkość obrotu na łukach toru (im więcej, tym szybsze nastawienie kierunku jazdy).")]
         [SerializeField] float rotationSlerpSpeed = 10f;
+        [Tooltip("Szybkość ruchu w stanach DrivingToBottle / ReturningToGarage (jednostek world / s).")]
+        [SerializeField] float offConveyorMoveSpeed = 4f;
 
         Truck truck;
         ConveyorTrack track;
@@ -82,7 +84,6 @@ namespace Project.Zone1.Trucks
             switch (truck.State)
             {
                 case TruckState.InGarage:
-                case TruckState.ReturningToGarage:
                     transform.position = garageParkPosition;
                     transform.rotation = Quaternion.identity;
                     break;
@@ -90,6 +91,33 @@ namespace Project.Zone1.Trucks
                     transform.position = waitingPosition;
                     transform.rotation = Quaternion.identity;
                     break;
+                case TruckState.DrivingToBottle:
+                {
+                    Vector3 target = truck.DumpTargetWorldPos;
+                    transform.position = Vector3.MoveTowards(transform.position, target, offConveyorMoveSpeed * Time.deltaTime);
+                    Vector3 dir = target - transform.position;
+                    if (dir.sqrMagnitude > 0.0001f)
+                    {
+                        Quaternion targetRot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSlerpSpeed * Time.deltaTime);
+                    }
+                    break;
+                }
+                case TruckState.Dumping:
+                    transform.position = truck.DumpTargetWorldPos;
+                    break;
+                case TruckState.ReturningToGarage:
+                {
+                    Vector3 target = truck.DumpTargetWorldPos;
+                    transform.position = Vector3.MoveTowards(transform.position, target, offConveyorMoveSpeed * Time.deltaTime);
+                    Vector3 dir = target - transform.position;
+                    if (dir.sqrMagnitude > 0.0001f)
+                    {
+                        Quaternion targetRot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSlerpSpeed * Time.deltaTime);
+                    }
+                    break;
+                }
                 default:
                     if (track != null)
                     {

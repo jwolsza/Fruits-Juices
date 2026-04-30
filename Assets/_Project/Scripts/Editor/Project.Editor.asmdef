@@ -5,7 +5,8 @@
         "Project.Core",
         "Project.Data",
         "Project.Zone1.FruitWall",
-        "Project.Zone1.Trucks"
+        "Project.Zone1.Trucks",
+        "Project.Zone2.Bottling"
     ],
     "includePlatforms": [
         "Editor"

@@ -6,8 +6,8 @@ namespace Project.Zone1.Trucks
     public class ConveyorTrack
     {
         readonly List<ConveyorWaypoint> waypoints;
-        readonly float[] segmentLengths;
-        readonly float totalLength;
+        float[] segmentLengths;
+        float totalLength;
         readonly List<ConveyorSlot> slots;
 
         bool paused;
@@ -63,17 +63,7 @@ namespace Project.Zone1.Trucks
         public ConveyorTrack(IList<ConveyorWaypoint> waypoints, int slotCount)
         {
             this.waypoints = new List<ConveyorWaypoint>(waypoints);
-            int n = this.waypoints.Count;
-            segmentLengths = new float[n];
-            float total = 0f;
-            for (int i = 0; i < n; i++)
-            {
-                int next = (i + 1) % n;
-                float len = Vector3.Distance(this.waypoints[i].Position, this.waypoints[next].Position);
-                segmentLengths[i] = len;
-                total += len;
-            }
-            totalLength = total;
+            RecomputeLengths();
 
             slots = new List<ConveyorSlot>(slotCount);
             for (int i = 0; i < slotCount; i++)
@@ -81,6 +71,35 @@ namespace Project.Zone1.Trucks
                 float offset = slotCount > 0 ? (float)i / slotCount : 0f;
                 slots.Add(new ConveyorSlot(i, offset));
             }
+        }
+
+        /// <summary>
+        /// Replace waypoints in-place and recompute segment lengths + total length.
+        /// Slots keep their TrackPosition (normalized 0..1) so they stay at the same
+        /// fraction of the new geometry. Use to support runtime expansion / contraction.
+        /// </summary>
+        public void RebuildFromWaypoints(IList<ConveyorWaypoint> newWaypoints)
+        {
+            if (newWaypoints == null) return;
+            this.waypoints.Clear();
+            foreach (var wp in newWaypoints) this.waypoints.Add(wp);
+            RecomputeLengths();
+        }
+
+        void RecomputeLengths()
+        {
+            int n = waypoints.Count;
+            if (segmentLengths == null || segmentLengths.Length != n)
+                segmentLengths = new float[n];
+            float total = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                int next = (i + 1) % n;
+                float len = Vector3.Distance(waypoints[i].Position, waypoints[next].Position);
+                segmentLengths[i] = len;
+                total += len;
+            }
+            totalLength = total;
         }
 
         public Vector3 GetWorldPositionAtTrackParam(float t)
@@ -240,6 +259,18 @@ namespace Project.Zone1.Trucks
                     slot.IsStopped = false;
                     return;
                 }
+            }
+        }
+
+        /// <summary>Ensures track has at least `desiredCount` slots. New slots are appended with
+        /// evenly-distributed initial TrackPosition. Existing slots keep their positions.</summary>
+        public void EnsureSlotCount(int desiredCount)
+        {
+            while (slots.Count < desiredCount)
+            {
+                int newIdx = slots.Count;
+                float pos = desiredCount > 0 ? (float)newIdx / desiredCount : 0f;
+                slots.Add(new ConveyorSlot(newIdx, pos));
             }
         }
 

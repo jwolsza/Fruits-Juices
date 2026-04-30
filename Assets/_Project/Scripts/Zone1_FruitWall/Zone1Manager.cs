@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Project.Core;
 using Project.Data;
@@ -16,6 +17,8 @@ namespace Project.Zone1.FruitWall
         FruitGrid grid;
         RefillController refill;
         SystemRandomSource rng;
+        readonly List<FruitType> activeFruitTypes = new();
+        public IReadOnlyList<FruitType> ActiveFruitTypes => activeFruitTypes;
 
         public FruitGrid Grid => grid;
         public Transform WallTransform => wallView != null ? wallView.transform : null;
@@ -45,13 +48,56 @@ namespace Project.Zone1.FruitWall
 
             grid = new FruitGrid(balance.WallColumns, balance.WallRows);
             rng = new SystemRandomSource();
+
+            RebuildActiveFruitTypes(0);
+            // Refill pool is driven by Zone1TrucksManager (only fruits matching owned trucks).
+            // Init empty — trucks populate it via SetRefillFruitPool after they spawn.
             refill = new RefillController(
                 grid,
-                balance.StartingFruitTypes,
+                new FruitType[0],
                 rng,
                 balance.RefillSpawnsPerTick);
 
             wallView.Initialize(grid, balance.WallWidthWorldUnits, balance.WallHeightWorldUnits);
+        }
+
+        /// <summary>
+        /// Set how many extra (locked) fruit types are unlocked for purchase (FruitTypeSpawnerPanel).
+        /// Refill pool is NOT affected — that's driven by owned trucks via SetRefillFruitPool.
+        /// </summary>
+        public void SetExtraUnlockedTypes(int extraUnlocked)
+        {
+            RebuildActiveFruitTypes(extraUnlocked);
+        }
+
+        /// <summary>Set the refill controller's fruit pool (caller decides which fruits can spawn).</summary>
+        public void SetRefillFruitPool(FruitType[] pool)
+        {
+            if (refill != null) refill.SetFruitPool(pool);
+        }
+
+        void RebuildActiveFruitTypes(int extraUnlocked)
+        {
+            activeFruitTypes.Clear();
+            if (balance.StartingFruitTypes != null)
+                foreach (var t in balance.StartingFruitTypes) activeFruitTypes.Add(t);
+            if (balance.LockedFruitTypes != null)
+            {
+                int n = Mathf.Min(Mathf.Max(0, extraUnlocked), balance.LockedFruitTypes.Length);
+                for (int i = 0; i < n; i++) activeFruitTypes.Add(balance.LockedFruitTypes[i]);
+            }
+        }
+
+        /// <summary>
+        /// Grow the wall — adds columns at left, columns at right, rows at top. Existing cells/fruits
+        /// stay at their original world positions (achieved by shifting WallView anchor).
+        /// </summary>
+        public void GrowWall(int addLeft, int addRight, int addTop)
+        {
+            if (grid == null || wallView == null) return;
+            if (addLeft <= 0 && addRight <= 0 && addTop <= 0) return;
+            grid.Grow(addLeft, addRight, addTop);
+            wallView.OnGridGrew(addLeft, addRight, addTop);
         }
 
         void Update()
@@ -86,12 +132,18 @@ namespace Project.Zone1.FruitWall
             }
         }
 
-        public void StartRefill()
+        /// <summary>Refill until grid.OccupiedCount reaches targetOccupied (no-op if already there).</summary>
+        public void StartRefill(int targetOccupied)
         {
             if (refill.IsRefilling || grid.IsFull) return;
-            refill.Start();
-            EmitRefillingChanged(true);
+            if (grid.OccupiedCount >= targetOccupied) return;
+            refill.Start(targetOccupied);
+            if (refill.IsRefilling) EmitRefillingChanged(true);
         }
+
+        public int GridCellCount => grid != null ? grid.Columns * grid.Rows : 0;
+        public int GridOccupiedCount => grid != null ? grid.OccupiedCount : 0;
+        public bool IsRefillInProgress => refill != null && refill.IsRefilling;
 
         void EmitRefillingChanged(bool isRefilling)
         {

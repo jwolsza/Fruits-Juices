@@ -55,8 +55,10 @@ namespace Project.Zone1.Trucks
         void Update()
         {
             if (manager == null) return;
-            if (label != null) label.text = $"{type} ({manager.GetTruckCount(type)})";
-            if (button != null) button.interactable = manager.CanAddTruck();
+            bool atLimit = manager.GetTruckCount(type) >= 1;
+            string status = atLimit ? "Limit Reached" : "Buy Truck";
+            if (label != null) label.text = $"{type}\n({status})";
+            if (button != null) button.interactable = manager.CanAddTruckOfType(type);
         }
     }
 }

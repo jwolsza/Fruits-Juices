@@ -13,10 +13,12 @@ namespace Project.Zone1.Trucks
     public class FlyingFruitPool : MonoBehaviour
     {
         [SerializeField] int poolSize = 50;
-        [Tooltip("Czas trwania animacji od ściany do ciężarówki (sec).")]
-        [SerializeField] float flyDurationSec = 0.3f;
-        [Tooltip("Wysokość łuku (peak parabolic, world units).")]
-        [SerializeField] float arcHeightWorld = 0.4f;
+        [Tooltip("Zakres czasu lotu (min, max) — każdy owoc dostaje randomową wartość z tego przedziału.")]
+        [SerializeField] Vector2 flyDurationRange = new(0.25f, 0.4f);
+        [Tooltip("Zakres wysokości łuku (min, max) — randomowy peak per owoc.")]
+        [SerializeField] Vector2 arcHeightRange = new(0.3f, 0.6f);
+        [Tooltip("Maksymalny boczny offset startowy (jitter pozycji startowej, world units).")]
+        [SerializeField] float lateralStartJitter = 0.1f;
         [Tooltip("Mnożnik rozmiaru lecącego owocu względem rozmiaru komórki gridu.")]
         [SerializeField] float sizeMultiplier = 4f;
         [SerializeField] string sortingLayerName = "Default";
@@ -49,7 +51,15 @@ namespace Project.Zone1.Trucks
             var view = available.Dequeue();
             view.gameObject.SetActive(true);
 
-            view.Begin(target, fromWorld, worldRot, arcHeightWorld, flyDurationSec);
+            // Randomize per-fruit parameters for variation.
+            float dur = Random.Range(flyDurationRange.x, flyDurationRange.y);
+            float arc = Random.Range(arcHeightRange.x, arcHeightRange.y);
+            Vector3 jittered = fromWorld + new Vector3(
+                Random.Range(-lateralStartJitter, lateralStartJitter),
+                Random.Range(-lateralStartJitter, lateralStartJitter),
+                Random.Range(-lateralStartJitter, lateralStartJitter));
+
+            view.Begin(target, jittered, worldRot, arc, dur);
             Vector3 lossy = target.lossyScale;
             float sx = lossy.x != 0f ? sizeWorld.x * sizeMultiplier / lossy.x : sizeWorld.x * sizeMultiplier;
             float sy = lossy.y != 0f ? sizeWorld.y * sizeMultiplier / lossy.y : sizeWorld.y * sizeMultiplier;

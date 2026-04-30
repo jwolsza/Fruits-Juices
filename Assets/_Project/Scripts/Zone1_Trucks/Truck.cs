@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Project.Core;
+using UnityEngine;
 
 namespace Project.Zone1.Trucks
 {
@@ -10,6 +12,8 @@ namespace Project.Zone1.Trucks
         public int Load { get; private set; }
         public TruckState State { get; set; } = TruckState.InGarage;
         public float TrackPosition { get; set; }
+        public Vector3 DumpTargetWorldPos { get; set; }
+        public Queue<Vector3> WaypointQueue { get; } = new();
 
         public bool IsFull => Load >= Capacity;
 
@@ -21,6 +25,12 @@ namespace Project.Zone1.Trucks
         }
 
         public void AddFruit() { if (Load < Capacity) Load++; }
+        public void RemoveFruits(int n)
+        {
+            if (n <= 0) return;
+            Load -= n;
+            if (Load < 0) Load = 0;
+        }
         public void EmptyLoad() { Load = 0; }
         public void SetCapacity(int newCapacity) { Capacity = newCapacity; }
     }

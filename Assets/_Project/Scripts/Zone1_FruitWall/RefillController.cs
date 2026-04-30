@@ -22,13 +22,14 @@ namespace Project.Zone1.FruitWall
     public class RefillController
     {
         readonly FruitGrid grid;
-        readonly FruitType[] fruitPool;
+        FruitType[] fruitPool;
         readonly IRandomSource random;
         readonly int spawnsPerTick;
 
         readonly List<int> emptyTopColumnsBuffer = new();
 
         public bool IsRefilling { get; private set; }
+        public int TargetOccupied { get; private set; }
 
         public RefillController(FruitGrid grid, FruitType[] fruitPool, IRandomSource random, int spawnsPerTick)
         {
@@ -38,9 +39,20 @@ namespace Project.Zone1.FruitWall
             this.spawnsPerTick = spawnsPerTick;
         }
 
-        public void Start()
+        public void SetFruitPool(FruitType[] pool)
         {
-            if (grid.IsFull) return;
+            fruitPool = pool ?? new FruitType[0];
+        }
+
+        /// <summary>
+        /// Start refill targeting an absolute occupied-cell count (caller computes from level/percent).
+        /// No-op if grid is already at/above target.
+        /// </summary>
+        public void Start(int targetOccupied)
+        {
+            int cap = Math.Min(targetOccupied, grid.Columns * grid.Rows);
+            if (grid.OccupiedCount >= cap) return;
+            TargetOccupied = cap;
             IsRefilling = true;
         }
 
@@ -57,6 +69,8 @@ namespace Project.Zone1.FruitWall
 
             for (int attempt = 0; attempt < spawnsPerTick; attempt++)
             {
+                if (grid.OccupiedCount >= TargetOccupied) break;
+
                 emptyTopColumnsBuffer.Clear();
                 for (int x = 0; x < grid.Columns; x++)
                 {
@@ -74,7 +88,7 @@ namespace Project.Zone1.FruitWall
                 grid.SetCell(chosenX, topRowY, fruitPool[fruitIdx]);
             }
 
-            if (grid.IsFull)
+            if (grid.IsFull || grid.OccupiedCount >= TargetOccupied)
                 IsRefilling = false;
         }
     }

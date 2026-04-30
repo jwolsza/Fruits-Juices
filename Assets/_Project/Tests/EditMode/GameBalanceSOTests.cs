@@ -39,6 +39,9 @@ namespace Project.Tests.EditMode
             CollectionAssert.AreEqual(
                 new[] { FruitType.Apple, FruitType.Orange, FruitType.Lemon },
                 balance.StartingFruitTypes);
+            CollectionAssert.AreEqual(
+                new[] { FruitType.Apple },
+                balance.InitialTruckTypes);
         }
     }
 }

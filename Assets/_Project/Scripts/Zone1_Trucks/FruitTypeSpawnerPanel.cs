@@ -1,19 +1,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Project.Core;
-using Project.Data;
+using Project.Zone1.FruitWall;
 
 namespace Project.Zone1.Trucks
 {
     /// <summary>
     /// Generuje FruitTypeSpawnerButton'y dynamicznie — po jednym dla każdego typu owocu z
-    /// balance.StartingFruitTypes. Jeśli lista typów się rozszerzy w runtime (np. odblokowanie
-    /// nowego owoca), brakujące button'y dodawane są automatycznie.
+    /// Zone1Manager.ActiveFruitTypes (starter + odblokowane). Jeśli lista się rozszerzy w
+    /// runtime (np. po wall upgrade), brakujące button'y dodawane są automatycznie.
     /// </summary>
     public class FruitTypeSpawnerPanel : MonoBehaviour
     {
-        [Tooltip("Source listy aktualnie dostępnych typów owoców (StartingFruitTypes).")]
-        [SerializeField] GameBalanceSO balance;
+        [SerializeField] Zone1Manager zone1Manager;
         [SerializeField] Zone1TrucksManager manager;
         [Tooltip("Prefab template button'a — będzie klonowany dla każdego typu. Sam template jest dezaktywowany przy starcie.")]
         [SerializeField] FruitTypeSpawnerButton buttonTemplate;
@@ -35,10 +34,11 @@ namespace Project.Zone1.Trucks
 
         public void RefreshButtons()
         {
-            if (balance == null || manager == null || buttonTemplate == null || buttonContainer == null) return;
-            if (balance.StartingFruitTypes == null) return;
+            if (zone1Manager == null || manager == null || buttonTemplate == null || buttonContainer == null) return;
+            var active = zone1Manager.ActiveFruitTypes;
+            if (active == null) return;
 
-            foreach (var type in balance.StartingFruitTypes)
+            foreach (var type in active)
             {
                 if (buttons.ContainsKey(type)) continue;
                 var btn = Instantiate(buttonTemplate, buttonContainer);
