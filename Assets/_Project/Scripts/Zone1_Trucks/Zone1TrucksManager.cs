@@ -58,12 +58,10 @@ namespace Project.Zone1.Trucks
         [SerializeField] Zone2Manager zone2Manager;
         [Tooltip("Distance threshold (world) below which truck is considered arrived at dump target.")]
         [SerializeField] float dumpArriveDistance = 0.3f;
-        [Tooltip("Czas trwania stanu Dumping (sec) zanim truck wraca do garażu.")]
-        [SerializeField] float dumpDurationSec = 0.6f;
-        [Tooltip("Ile lecących owoców emitować podczas dump (visual cap, niezależne od truck.Load).")]
-        [SerializeField] int dumpFlyingFruitCount = 12;
-        [Tooltip("Rozmiar (world) lecącego owocu z ciężarówki do butelki.")]
-        [SerializeField] Vector2 dumpFruitSize = new(0.1f, 0.1f);
+        [Tooltip("Tempo dumpingu — ile owoców na sekundę leci z ciężarówki do butelki.")]
+        [SerializeField] float dumpRateFruitsPerSec = 80f;
+        [Tooltip("Rozmiar (world) lecącego owocu — małe, dużo na raz.")]
+        [SerializeField] Vector2 dumpFruitSize = new(0.05f, 0.05f);
 
         ConveyorTrack track;
         Garage garage;
@@ -71,7 +69,7 @@ namespace Project.Zone1.Trucks
         readonly Dictionary<int, TruckView> truckViews = new();
         readonly List<int> waitingDispatchQueue = new();
         readonly Dictionary<int, BigBottle> truckTargetBottles = new();
-        readonly Dictionary<int, float> truckDumpTimer = new();
+        readonly Dictionary<int, float> truckDumpEmitAccumulator = new();
         int nextTruckId = 1;
 
         float magnetAccumulator;
@@ -404,42 +402,55 @@ namespace Project.Zone1.Trucks
                     float dist = Vector3.Distance(view.transform.position, truck.DumpTargetWorldPos);
                     if (dist <= dumpArriveDistance)
                     {
-                        if (truckTargetBottles.TryGetValue(truck.Id, out var bottle) && zone2Manager != null)
+                        truck.State = TruckState.Dumping;
+                        truckDumpEmitAccumulator[truck.Id] = 0f;
+                    }
+                }
+                else if (truck.State == TruckState.Dumping)
+                {
+                    if (!truckTargetBottles.TryGetValue(truck.Id, out var bottle))
+                    {
+                        truck.State = TruckState.ReturningToGarage;
+                        continue;
+                    }
+
+                    if (truck.Load > 0)
+                    {
+                        float accum = truckDumpEmitAccumulator.GetValueOrDefault(truck.Id, 0f) + dumpRateFruitsPerSec * dt;
+                        int emit = Mathf.Min((int)accum, truck.Load);
+                        accum -= emit;
+                        truckDumpEmitAccumulator[truck.Id] = accum;
+
+                        if (emit > 0)
                         {
-                            // Visual: emit flying fruits truck → bottle (reuse pool from Plan #3).
-                            if (flyingFruitPool != null)
+                            // Visual: spawn N flying fruits truck → bottle.
+                            if (flyingFruitPool != null && truckViews.TryGetValue(truck.Id, out var view) && view != null && zone2Manager != null)
                             {
                                 var bottleTransform = zone2Manager.GetBottleTransform(bottle);
                                 if (bottleTransform != null)
-                                {
-                                    int n = Mathf.Min(truck.Load, dumpFlyingFruitCount);
-                                    for (int k = 0; k < n; k++)
+                                    for (int k = 0; k < emit; k++)
                                         flyingFruitPool.Fly(
                                             bottleTransform,
                                             view.transform.position,
                                             Quaternion.identity,
                                             truck.FruitColor,
                                             dumpFruitSize);
-                                }
                             }
-                            zone2Manager.Deposit(bottle, truck.FruitColor, truck.Load);
+
+                            // Data: deposit incrementally + decrement truck load (truck visually shrinks).
+                            if (zone2Manager != null) zone2Manager.Deposit(bottle, truck.FruitColor, emit);
+                            truck.RemoveFruits(emit);
                         }
-                        truck.EmptyLoad();
-                        truck.State = TruckState.Dumping;
-                        truckDumpTimer[truck.Id] = dumpDurationSec;
                     }
-                }
-                else if (truck.State == TruckState.Dumping)
-                {
-                    float t = truckDumpTimer.TryGetValue(truck.Id, out var v) ? v - dt : 0f;
-                    truckDumpTimer[truck.Id] = t;
-                    if (t <= 0f)
+
+                    if (truck.Load <= 0)
                     {
+                        truck.EmptyLoad();
                         truck.State = TruckState.ReturningToGarage;
                         truckTargetBottles.Remove(truck.Id);
-                        truckDumpTimer.Remove(truck.Id);
-                        if (truckViews.TryGetValue(truck.Id, out var view))
-                            view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                        truckDumpEmitAccumulator.Remove(truck.Id);
+                        if (truckViews.TryGetValue(truck.Id, out var v) && v != null)
+                            v.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
                     }
                 }
                 else if (truck.State == TruckState.ReturningToGarage)

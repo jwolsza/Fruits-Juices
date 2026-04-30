@@ -23,6 +23,12 @@ namespace Project.Zone1.Trucks
         }
 
         public void AddFruit() { if (Load < Capacity) Load++; }
+        public void RemoveFruits(int n)
+        {
+            if (n <= 0) return;
+            Load -= n;
+            if (Load < 0) Load = 0;
+        }
         public void EmptyLoad() { Load = 0; }
         public void SetCapacity(int newCapacity) { Capacity = newCapacity; }
     }
