@@ -74,11 +74,7 @@ namespace Project.Zone1.Trucks
         void Update()
         {
             if (label != null)
-            {
-                float scale = Mathf.Clamp(baseScale + level * stepPerLevel, baseScale, maxScale);
-                int activeTypes = zone1Manager != null ? zone1Manager.ActiveFruitTypes.Count : 0;
-                label.text = $"Wall lvl {level}\n({scale:F2}x, {activeTypes} types)";
-            }
+                label.text = $"Upgrade Wall (lvl. {level})";
             if (button != null)
             {
                 bool atMax = baseScale + (level + 1) * stepPerLevel > maxScale + 0.0001f;
