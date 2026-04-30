@@ -24,7 +24,8 @@ namespace Project.Zone1.Trucks
         [Header("Wall grid growth")]
         [SerializeField] int addLeftColsPerLevel = 10;
         [SerializeField] int addRightColsPerLevel = 10;
-        [SerializeField] int addRowsPerLevel = 20;
+        [Tooltip("Default 0 — ściana rośnie tylko na boki. Ustaw > 0 jeśli chcesz też rzędy u góry.")]
+        [SerializeField] int addRowsPerLevel = 0;
 
         [Header("Wall visual scale (optional — Wall musi być OSOBNYM GameObject od WallView/Grid)")]
         [Tooltip("Visual mesh ściany (osobny GameObject od WallView). Skala AUTO-liczona ze stosunku currentGrid/initialGrid, dzięki czemu rośnie razem z gridem.")]
@@ -96,10 +97,10 @@ namespace Project.Zone1.Trucks
             int currentCols = initialGridCols + level * (addLeftColsPerLevel + addRightColsPerLevel);
             int currentRows = initialGridRows + level * addRowsPerLevel;
             float widthRatio = (float)currentCols / initialGridCols;
-            float heightRatio = (float)currentRows / initialGridRows;
+            float heightRatio = initialGridRows > 0 ? (float)currentRows / initialGridRows : 1f;
 
-            // Skaluj X przez widthRatio (cols dimension) i Y+Z przez heightRatio
-            // (działa niezależnie od orientacji mesha — czy wymiar "rows" jest na local Y czy Z).
+            // Tylko X (cols dimension) skaluje się; Y i Z zostają (height nie rośnie).
+            // Jeśli user ustawi addRowsPerLevel > 0, heightRatio również może być zastosowany.
             wallVisualTransform.localScale = new Vector3(
                 initialVisualScale.x * widthRatio,
                 initialVisualScale.y * heightRatio,
