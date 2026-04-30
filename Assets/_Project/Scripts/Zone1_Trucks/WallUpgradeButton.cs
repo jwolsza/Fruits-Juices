@@ -14,14 +14,15 @@ namespace Project.Zone1.Trucks
     [RequireComponent(typeof(Button))]
     public class WallUpgradeButton : MonoBehaviour
     {
-        [SerializeField] Transform wallTransform;
         [SerializeField] Zone1Manager zone1Manager;
         [SerializeField] Zone1TrucksManager trucksManager;
 
-        [Header("Wall scale")]
-        [SerializeField] float baseScale = 0.5f;
-        [SerializeField] float maxScale = 1.1f;
-        [SerializeField] float stepPerLevel = 0.05f;
+        [Header("Wall growth (rows + columns added per level)")]
+        [Tooltip("Ile rzędów dodać u góry ściany per upgrade level (puste komórki, fruity istniejące zostają na dole).")]
+        [SerializeField] int addRowsPerLevel = 20;
+        [Tooltip("Ile kolumn dodać po prawej stronie ściany per upgrade level.")]
+        [SerializeField] int addColsPerLevel = 0;
+        [SerializeField] int maxLevel = 12;
 
         [Header("Track expansion")]
         [Tooltip("Ile world units rozszerzyć conveyor (lewy bok -X, prawy bok +X) per upgrade level.")]
@@ -44,15 +45,19 @@ namespace Project.Zone1.Trucks
             button = GetComponent<Button>();
             button.onClick.AddListener(Upgrade);
             if (trucksManager != null) baseTruckSpeed = trucksManager.TruckSpeedUnitsPerSec;
-            ApplyScaleAndTypes();
+            // Initial unlock state for level 0 (no extras).
+            if (zone1Manager != null) zone1Manager.SetExtraUnlockedTypes(0);
         }
 
         void Upgrade()
         {
-            float next = baseScale + (level + 1) * stepPerLevel;
-            if (next > maxScale + 0.0001f) return;
+            if (level >= maxLevel) return;
             level++;
-            ApplyScaleAndTypes();
+            if (zone1Manager != null)
+            {
+                zone1Manager.SetExtraUnlockedTypes(level);
+                zone1Manager.GrowWall(addColsPerLevel, addRowsPerLevel);
+            }
             if (trucksManager != null)
             {
                 trucksManager.ExpandTrack(trackXStepPerLevel);
@@ -60,26 +65,11 @@ namespace Project.Zone1.Trucks
             }
         }
 
-        void ApplyScaleAndTypes()
-        {
-            if (wallTransform != null)
-            {
-                float scale = Mathf.Clamp(baseScale + level * stepPerLevel, baseScale, maxScale);
-                wallTransform.localScale = new Vector3(scale, scale, scale);
-            }
-            if (zone1Manager != null)
-                zone1Manager.SetExtraUnlockedTypes(level);
-        }
-
         void Update()
         {
             if (label != null)
                 label.text = $"Upgrade Wall (lvl. {level})";
-            if (button != null)
-            {
-                bool atMax = baseScale + (level + 1) * stepPerLevel > maxScale + 0.0001f;
-                button.interactable = !atMax;
-            }
+            if (button != null) button.interactable = level < maxLevel;
         }
     }
 }

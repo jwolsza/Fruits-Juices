@@ -14,12 +14,18 @@ namespace Project.Zone1.FruitWall
         SpriteRenderer[,] cellRenderers;
         Color[,] lastColors;
         Sprite generatedSprite;
+        float cellWidth;
+        float cellHeight;
+
+        public float CellWidth => cellWidth;
+        public float CellHeight => cellHeight;
 
         public Vector3 GetCellWorldPosition(int cellX, int cellY)
         {
             if (cellRenderers == null || grid == null) return transform.position;
             if (cellX < 0 || cellX >= grid.Columns || cellY < 0 || cellY >= grid.Rows) return transform.position;
-            return cellRenderers[cellX, cellY].transform.position;
+            var renderer = cellRenderers[cellX, cellY];
+            return renderer != null ? renderer.transform.position : transform.position;
         }
 
         public Vector2 GetCellWorldSize()
@@ -54,41 +60,77 @@ namespace Project.Zone1.FruitWall
             cellRenderers = new SpriteRenderer[grid.Columns, grid.Rows];
             lastColors = new Color[grid.Columns, grid.Rows];
 
-            float cellWidth = wallWidth / grid.Columns;
-            float cellHeight = wallHeight / grid.Rows;
+            cellWidth = wallWidth / grid.Columns;
+            cellHeight = wallHeight / grid.Rows;
 
             for (int x = 0; x < grid.Columns; x++)
-            {
                 for (int y = 0; y < grid.Rows; y++)
+                    CreateCell(x, y);
+        }
+
+        /// <summary>
+        /// After grid was resized to (newCols, newRows), instantiate sprites for newly added cells.
+        /// Existing cells (x<oldCols, y<oldRows) are preserved with their world positions and fruits.
+        /// </summary>
+        public void ResyncToGrid()
+        {
+            if (grid == null) return;
+            int oldCols = cellRenderers != null ? cellRenderers.GetLength(0) : 0;
+            int oldRows = cellRenderers != null ? cellRenderers.GetLength(1) : 0;
+            int newCols = grid.Columns;
+            int newRows = grid.Rows;
+            if (newCols == oldCols && newRows == oldRows) return;
+
+            var newCellRenderers = new SpriteRenderer[newCols, newRows];
+            var newLastColors = new Color[newCols, newRows];
+
+            for (int x = 0; x < oldCols && x < newCols; x++)
+                for (int y = 0; y < oldRows && y < newRows; y++)
                 {
-                    var go = new GameObject($"Cell_{x}_{y}");
-                    go.transform.SetParent(transform, worldPositionStays: false);
-                    go.transform.localPosition = new Vector3(
-                        x * cellWidth + cellWidth * 0.5f,
-                        y * cellHeight + cellHeight * 0.5f,
-                        0f);
-                    go.transform.localScale = new Vector3(cellWidth, cellHeight, 1f);
-
-                    var sr = go.AddComponent<SpriteRenderer>();
-                    sr.sprite = ResolveSprite();
-                    sr.color = FruitColorPalette.EmptyColor;
-                    sr.sortingLayerName = sortingLayerName;
-                    sr.sortingOrder = sortingOrderBase;
-
-                    cellRenderers[x, y] = sr;
-                    lastColors[x, y] = sr.color;
+                    newCellRenderers[x, y] = cellRenderers[x, y];
+                    newLastColors[x, y] = lastColors[x, y];
                 }
-            }
+
+            cellRenderers = newCellRenderers;
+            lastColors = newLastColors;
+
+            for (int x = 0; x < newCols; x++)
+                for (int y = 0; y < newRows; y++)
+                    if (cellRenderers[x, y] == null) CreateCell(x, y);
+        }
+
+        void CreateCell(int x, int y)
+        {
+            var go = new GameObject($"Cell_{x}_{y}");
+            go.transform.SetParent(transform, worldPositionStays: false);
+            go.transform.localPosition = new Vector3(
+                x * cellWidth + cellWidth * 0.5f,
+                y * cellHeight + cellHeight * 0.5f,
+                0f);
+            go.transform.localScale = new Vector3(cellWidth, cellHeight, 1f);
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = ResolveSprite();
+            sr.color = FruitColorPalette.EmptyColor;
+            sr.sortingLayerName = sortingLayerName;
+            sr.sortingOrder = sortingOrderBase;
+
+            cellRenderers[x, y] = sr;
+            lastColors[x, y] = sr.color;
         }
 
         void LateUpdate()
         {
             if (grid == null || cellRenderers == null) return;
 
-            for (int x = 0; x < grid.Columns; x++)
+            int cols = cellRenderers.GetLength(0);
+            int rows = cellRenderers.GetLength(1);
+            for (int x = 0; x < cols && x < grid.Columns; x++)
             {
-                for (int y = 0; y < grid.Rows; y++)
+                for (int y = 0; y < rows && y < grid.Rows; y++)
                 {
+                    var renderer = cellRenderers[x, y];
+                    if (renderer == null) continue;
                     var cell = grid.GetCell(x, y);
                     Color desired = cell.HasValue
                         ? FruitColorPalette.GetColor(cell.Value)
@@ -96,7 +138,7 @@ namespace Project.Zone1.FruitWall
 
                     if (lastColors[x, y] != desired)
                     {
-                        cellRenderers[x, y].color = desired;
+                        renderer.color = desired;
                         lastColors[x, y] = desired;
                     }
                 }

@@ -81,6 +81,19 @@ namespace Project.Zone1.FruitWall
             }
         }
 
+        /// <summary>
+        /// Grow the wall — adds rows at top + columns at right, keeping existing cells/fruits at
+        /// their original positions. Wall transform stays unscaled; visual growth comes from extra
+        /// cell instances (each cell stays the same world size).
+        /// </summary>
+        public void GrowWall(int addCols, int addRows)
+        {
+            if (grid == null || wallView == null) return;
+            if (addCols > 0) grid.AddColumnsAtRight(addCols);
+            if (addRows > 0) grid.AddRowsAtTop(addRows);
+            wallView.ResyncToGrid();
+        }
+
         void Update()
         {
             float dt = Time.deltaTime;
