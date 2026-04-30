@@ -262,6 +262,18 @@ namespace Project.Zone1.Trucks
             }
         }
 
+        /// <summary>Ensures track has at least `desiredCount` slots. New slots are appended with
+        /// evenly-distributed initial TrackPosition. Existing slots keep their positions.</summary>
+        public void EnsureSlotCount(int desiredCount)
+        {
+            while (slots.Count < desiredCount)
+            {
+                int newIdx = slots.Count;
+                float pos = desiredCount > 0 ? (float)newIdx / desiredCount : 0f;
+                slots.Add(new ConveyorSlot(newIdx, pos));
+            }
+        }
+
         public ConveyorSlot FindSlotForTruck(Truck truck)
         {
             foreach (var slot in slots)

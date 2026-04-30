@@ -152,9 +152,15 @@ namespace Project.Zone1.Trucks
 
             track.RebuildFromWaypoints(conveyorWaypoints);
 
-            // Recompute MinSlotSpacing relative to new totalLength.
             if (track.TotalLength > 0f)
+            {
                 track.MinSlotSpacing = truckLengthWorldUnits / track.TotalLength;
+
+                // Recompute desired slot count from new track length and add slots if needed.
+                float perSlot = Mathf.Max(0.0001f, truckLengthWorldUnits + gapBetweenTrucksWorldUnits);
+                int newCount = Mathf.Max(1, Mathf.FloorToInt(track.TotalLength / perSlot));
+                if (newCount > track.Slots.Count) track.EnsureSlotCount(newCount);
+            }
 
             conveyorView?.Build(track.Waypoints);
         }
