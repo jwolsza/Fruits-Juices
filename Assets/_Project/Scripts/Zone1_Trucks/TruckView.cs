@@ -108,7 +108,7 @@ namespace Project.Zone1.Trucks
                     break;
                 case TruckState.ReturningToGarage:
                 {
-                    Vector3 target = garageParkPosition;
+                    Vector3 target = truck.DumpTargetWorldPos;
                     transform.position = Vector3.MoveTowards(transform.position, target, offConveyorMoveSpeed * Time.deltaTime);
                     Vector3 dir = target - transform.position;
                     if (dir.sqrMagnitude > 0.0001f)

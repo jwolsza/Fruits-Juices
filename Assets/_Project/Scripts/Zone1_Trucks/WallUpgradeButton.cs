@@ -109,7 +109,7 @@ namespace Project.Zone1.Trucks
 
         void Update()
         {
-            if (label != null) label.text = $"Upgrade Wall (lvl. {level})";
+            if (label != null) label.text = $"Upgrade Conveyor (lvl. {level})";
             if (button != null) button.interactable = level < maxLevel;
         }
     }

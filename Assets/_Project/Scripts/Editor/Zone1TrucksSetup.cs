@@ -155,20 +155,6 @@ namespace Project.Editor
                 elem.FindPropertyRelative("SlotIndex").intValue = slotIdx;
             }
 
-            // Wall slots — sync to the same positions, last one IsStopSlot=true.
-            var wallSlotsProp = so.FindProperty("wallSlots");
-            wallSlotsProp.arraySize = ActiveSlotPointIndexes.Length;
-            for (int s = 0; s < ActiveSlotPointIndexes.Length; s++)
-            {
-                int pointIdx = ActiveSlotPointIndexes[s];
-                if (pointIdx < 0 || pointIdx >= count) continue;
-                bool isStop = (s == ActiveSlotPointIndexes.Length - 1);
-                var elem = wallSlotsProp.GetArrayElementAtIndex(s);
-                elem.FindPropertyRelative("WorldPosition").vector3Value = positions[pointIdx];
-                elem.FindPropertyRelative("SlotIndex").intValue = s;
-                elem.FindPropertyRelative("IsStopSlot").boolValue = isStop;
-            }
-
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(manager);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(manager.gameObject.scene);
@@ -253,7 +239,6 @@ namespace Project.Editor
 
             so.FindProperty("balance").objectReferenceValue = balance;
             so.FindProperty("zone1Manager").objectReferenceValue = zone1Manager;
-            so.FindProperty("onRefillingChanged").objectReferenceValue = refillEvent;
             so.FindProperty("conveyorView").objectReferenceValue = conveyorView;
             so.FindProperty("truckSpeedUnitsPerSec").floatValue = 1.5f;
             so.FindProperty("garageView").objectReferenceValue = garageView;
@@ -281,22 +266,6 @@ namespace Project.Editor
                 elem.FindPropertyRelative("SlotIndex").intValue = waypoints[i].slot;
             }
 
-            // Wall slots (3)
-            var wallSlotsProp = so.FindProperty("wallSlots");
-            var slots = new (Vector3 pos, int idx, bool stop)[]
-            {
-                (new Vector3(4f, 0f, -0.5f),  0, false),
-                (new Vector3(8f, 0f, -0.5f),  1, false),
-                (new Vector3(12f, 0f, -0.5f), 2, true),
-            };
-            wallSlotsProp.arraySize = slots.Length;
-            for (int i = 0; i < slots.Length; i++)
-            {
-                var elem = wallSlotsProp.GetArrayElementAtIndex(i);
-                elem.FindPropertyRelative("WorldPosition").vector3Value = slots[i].pos;
-                elem.FindPropertyRelative("SlotIndex").intValue = slots[i].idx;
-                elem.FindPropertyRelative("IsStopSlot").boolValue = slots[i].stop;
-            }
 
             so.ApplyModifiedPropertiesWithoutUndo();
         }

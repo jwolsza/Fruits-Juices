@@ -13,7 +13,6 @@ namespace Project.Zone1.Trucks
         [Header("Config")]
         [SerializeField] GameBalanceSO balance;
         [SerializeField] Zone1Manager zone1Manager;
-        [SerializeField] BoolEventChannelSO onRefillingChanged;
 
         [Header("Conveyor")]
         [SerializeField] List<ConveyorWaypoint> conveyorWaypoints;
@@ -40,8 +39,13 @@ namespace Project.Zone1.Trucks
         [Tooltip("Dodatkowy offset per kolejny indeks w queue (kolejne czekające stoją dalej od pierwszego).")]
         [SerializeField] Vector3 waitingStepOffset = new(0f, 0f, 0.2f);
 
-        [Header("Wall slots (active spots)")]
-        [SerializeField] List<WallSlot> wallSlots;
+        [Header("Collecting zone (track param range between two waypoints)")]
+        [Tooltip("Waypoint indeks startu strefy zbierania. Truck zbiera magnetem gdy jego TrackPosition ∈ [start, end].")]
+        [SerializeField] int collectStartWaypointIndex = 4;
+        [Tooltip("Waypoint indeks końca strefy zbierania. Tu też zatrzymuje truck który jeszcze może zbierać.")]
+        [SerializeField] int collectEndWaypointIndex = 6;
+        [Tooltip("Tolerancja (track-param 0..1) dla zatrzymania przy waypoincie końca strefy.")]
+        [SerializeField] float collectStopWindow = 0.02f;
 
         [Header("Garage")]
         [SerializeField] GarageView garageView;
@@ -56,6 +60,8 @@ namespace Project.Zone1.Trucks
 
         [Header("Zone 2 (bottling)")]
         [SerializeField] Zone2Manager zone2Manager;
+        [Tooltip("Pierwszy waypoint między conveyorem a butelkami. Truck dojeżdża tu zanim zjedzie do rzędu butelek (i wraca przez ten punkt do garażu).")]
+        [SerializeField] Transform pathStartPoint;
         [Tooltip("Distance threshold (world) below which truck is considered arrived at dump target.")]
         [SerializeField] float dumpArriveDistance = 0.3f;
         [Tooltip("Tempo dumpingu — ile owoców na sekundę leci z ciężarówki do butelki.")]
@@ -75,17 +81,6 @@ namespace Project.Zone1.Trucks
 
         float magnetAccumulator;
         int magnetTickIndex;
-        bool isRefilling;
-
-        void OnEnable()
-        {
-            if (onRefillingChanged != null) onRefillingChanged.Raised += OnRefillingChangedHandler;
-        }
-        void OnDisable()
-        {
-            if (onRefillingChanged != null) onRefillingChanged.Raised -= OnRefillingChangedHandler;
-        }
-        void OnRefillingChangedHandler(bool v) => isRefilling = v;
 
         void Start()
         {
@@ -107,6 +102,9 @@ namespace Project.Zone1.Trucks
             var initialTypes = balance.InitialTruckTypes ?? balance.StartingFruitTypes;
             if (initialTypes != null)
                 foreach (var fruit in initialTypes) AddTruck(fruit);
+
+            // Even if no trucks spawned, pool needs starter types right away.
+            RefreshRefillPool();
         }
 
         public bool AddTruck(FruitType type)
@@ -130,7 +128,24 @@ namespace Project.Zone1.Trucks
 
             Vector3 parkPos = garageView.GetParkPositionFor(truck.Id);
             view.Bind(truck, track, parkPos);
+
+            RefreshRefillPool();
             return true;
+        }
+
+        void RefreshRefillPool()
+        {
+            if (zone1Manager == null) return;
+            var unique = new HashSet<FruitType>();
+            // Starter types (Apple, Orange, Lemon) zawsze w poolu — nawet bez trucka.
+            if (balance != null && balance.StartingFruitTypes != null)
+                foreach (var t in balance.StartingFruitTypes) unique.Add(t);
+            // Plus typy obecnie posiadanych trucków.
+            foreach (var t in trucks) unique.Add(t.FruitColor);
+            var arr = new FruitType[unique.Count];
+            int i = 0;
+            foreach (var ft in unique) arr[i++] = ft;
+            zone1Manager.SetRefillFruitPool(arr);
         }
 
         public int GetTruckCount(FruitType type)
@@ -143,6 +158,74 @@ namespace Project.Zone1.Trucks
         public bool CanAddTruck() => garageView != null && garage != null && garage.TruckCount < garageView.MaxParkingSlots;
 
         public bool CanAddTruckOfType(FruitType type) => CanAddTruck() && GetTruckCount(type) < 1;
+
+        /// <summary>True jeśli choć jedna ciężarówka aktywnie zbiera — w strefie, nie pełna,
+        /// I jej kolor jest dostępny na dolnym rzędzie ściany (czyli magnet faktycznie coś jej da).</summary>
+        public bool IsAnyTruckCollecting()
+        {
+            if (track == null) return false;
+            foreach (var slot in track.Slots)
+            {
+                if (slot.IsEmpty || slot.Truck == null) continue;
+                if (!IsTrackParamInCollectingRange(slot.TrackPosition)) continue;
+                if (!CanTruckStillCollect(slot.Truck)) continue;
+                return true;
+            }
+            return false;
+        }
+
+        bool IsTrackParamInCollectingRange(float p)
+        {
+            if (track == null) return false;
+            float a = track.GetWaypointTrackParam(collectStartWaypointIndex);
+            float b = track.GetWaypointTrackParam(collectEndWaypointIndex);
+            p = Mathf.Repeat(p, 1f);
+            a = Mathf.Repeat(a, 1f);
+            b = Mathf.Repeat(b, 1f);
+            return a <= b ? (p >= a && p <= b) : (p >= a || p <= b);
+        }
+
+        bool CanTruckStillCollect(Truck truck)
+        {
+            if (truck == null || truck.IsFull) return false;
+            var grid = zone1Manager != null ? zone1Manager.Grid : null;
+            if (grid == null) return false;
+            for (int x = 0; x < grid.Columns; x++)
+                if (grid.GetCell(x, 0) == truck.FruitColor) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Stop the front-most truck (closest to collectEndWaypointIndex) that still has work
+        /// to do — i.e. nie pełna i grid ma jeszcze pasujące owoce. Pojedyncza ciężarówka stoi,
+        /// ogonek za nią dalej zbiera magnetem przejazdem (też w [start,end]).
+        /// </summary>
+        void UpdateCollectStopStates()
+        {
+            if (track == null) return;
+            foreach (var slot in track.Slots) slot.IsStopped = false;
+
+            float stopParam = track.GetWaypointTrackParam(collectEndWaypointIndex);
+
+            ConveyorSlot best = null;
+            float bestDist = collectStopWindow;
+            foreach (var slot in track.Slots)
+            {
+                if (slot.IsEmpty || slot.Truck == null) continue;
+                if (!CanTruckStillCollect(slot.Truck)) continue;
+                // Must STILL be inside collecting zone — don't freeze trucks that already drifted past waypoint end
+                // (they'd be stopped but outside magnet range → stuck forever).
+                if (!IsTrackParamInCollectingRange(slot.TrackPosition)) continue;
+                float dist = Mathf.Abs(((slot.TrackPosition - stopParam) + 1f) % 1f);
+                dist = Mathf.Min(dist, 1f - dist);
+                if (dist <= bestDist)
+                {
+                    bestDist = dist;
+                    best = slot;
+                }
+            }
+            if (best != null) best.IsStopped = true;
+        }
 
         /// <summary>
         /// Expands (or contracts) the conveyor by moving waypoints by `step` on X.
@@ -183,10 +266,7 @@ namespace Project.Zone1.Trucks
 
             HandleTapDispatch();
 
-            // Global pause = refill only. Per-slot stops handled below.
-            track.Paused = isRefilling;
-
-            UpdateSlotStopStates();
+            UpdateCollectStopStates();
             track.Tick(dt, truckSpeedUnitsPerSec);
 
             ProcessWaitingDispatchQueue();
@@ -197,7 +277,7 @@ namespace Project.Zone1.Trucks
             while (magnetAccumulator >= magnetInterval)
             {
                 magnetAccumulator -= magnetInterval;
-                if (!isRefilling) RunMagnetTick();
+                RunMagnetTick();
             }
 
             HandleFullTrucks();
@@ -274,62 +354,22 @@ namespace Project.Zone1.Trucks
             }
         }
 
-        void UpdateSlotStopStates()
-        {
-            // Reset all flags then mark at most ONE slot as stopped — the slot whose truck
-            // is closest to the stop wall slot AND can still collect. Otherwise trailing
-            // trucks clamped right behind would also fall in the stopWindow and freeze the
-            // whole queue.
-            foreach (var slot in track.Slots) slot.IsStopped = false;
-
-            int stopSlotIdx = -1;
-            for (int i = 0; i < wallSlots.Count; i++)
-                if (wallSlots[i].IsStopSlot) { stopSlotIdx = i; break; }
-            if (stopSlotIdx < 0) return;
-
-            float stopParam = ApproximateTrackParamForWorldPos(wallSlots[stopSlotIdx].WorldPosition);
-            const float stopWindow = 0.02f;
-
-            ConveyorSlot best = null;
-            float bestDist = stopWindow;
-            foreach (var slot in track.Slots)
-            {
-                if (slot.IsEmpty) continue;
-                if (!CanTruckStillCollect(slot.Truck)) continue;
-                float dist = Mathf.Abs(((slot.TrackPosition - stopParam) + 1f) % 1f);
-                dist = Mathf.Min(dist, 1f - dist);
-                if (dist <= bestDist)
-                {
-                    bestDist = dist;
-                    best = slot;
-                }
-            }
-            if (best != null) best.IsStopped = true;
-        }
-
-        bool CanTruckStillCollect(Truck truck)
-        {
-            if (truck.IsFull) return false;
-            var grid = zone1Manager.Grid;
-            if (grid == null) return false;
-            for (int x = 0; x < grid.Columns; x++)
-                if (grid.GetCell(x, 0) == truck.FruitColor) return true;
-            return false;
-        }
+        readonly List<Truck> activeTrucksBuffer = new();
 
         void RunMagnetTick()
         {
             var grid = zone1Manager.Grid;
             if (grid == null) return;
 
-            var activeTrucks = new List<Truck>();
-            foreach (var wallSlot in wallSlots)
+            activeTrucksBuffer.Clear();
+            foreach (var slot in track.Slots)
             {
-                Truck nearest = FindTruckAtConveyorSlotNear(wallSlot.WorldPosition);
-                if (nearest != null) activeTrucks.Add(nearest);
+                if (slot.IsEmpty || slot.Truck == null) continue;
+                if (!IsTrackParamInCollectingRange(slot.TrackPosition)) continue;
+                activeTrucksBuffer.Add(slot.Truck);
             }
 
-            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucks, magnetTickIndex);
+            var assignments = MagnetSystem.AssignFruitsToTrucksAtSlots(grid, activeTrucksBuffer, magnetTickIndex);
             magnetTickIndex++;
 
             if (flyingFruitPool != null && wallView != null)
@@ -345,20 +385,6 @@ namespace Project.Zone1.Trucks
                     }
                 }
             }
-        }
-
-        Truck FindTruckAtConveyorSlotNear(Vector3 wallSlotWorldPos)
-        {
-            float bestDist = 1.0f;
-            Truck best = null;
-            foreach (var slot in track.Slots)
-            {
-                if (slot.IsEmpty) continue;
-                Vector3 slotWorldPos = track.GetWorldPositionAtTrackParam(slot.TrackPosition);
-                float d = Vector3.Distance(slotWorldPos, wallSlotWorldPos);
-                if (d < bestDist) { bestDist = d; best = slot.Truck; }
-            }
-            return best;
         }
 
         void HandleFullTrucks()
@@ -380,31 +406,102 @@ namespace Project.Zone1.Trucks
 
                 if (bottle != null)
                 {
-                    truck.State = TruckState.DrivingToBottle;
-                    truck.DumpTargetWorldPos = zone2Manager.GetBottleWorldPosition(bottle);
-                    truckTargetBottles[truck.Id] = bottle;
-                    truckCurrentReservedAmount[truck.Id] = reserved;
+                    BeginDriveToBottle(truck, bottle, reserved, fromConveyor: true, previousBottle: null);
                 }
                 else
                 {
-                    truck.State = TruckState.ReturningToGarage;
                     truck.EmptyLoad();
-                    if (truckViews.TryGetValue(truck.Id, out var view))
-                        view.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                    BeginReturnToGarage(truck, fromBottle: null);
                 }
             }
         }
 
-        bool TryRouteRemainingLoad(Truck truck)
+        Vector3 WithPathY(Vector3 p)
+        {
+            if (pathStartPoint == null) return p;
+            p.y = pathStartPoint.position.y;
+            return p;
+        }
+
+        void BeginDriveToBottle(Truck truck, BigBottle bottle, int reserved, bool fromConveyor, BigBottle previousBottle)
+        {
+            truck.State = TruckState.DrivingToBottle;
+            truckTargetBottles[truck.Id] = bottle;
+            truckCurrentReservedAmount[truck.Id] = reserved;
+
+            truck.WaypointQueue.Clear();
+            Vector3 finalTarget = WithPathY(zone2Manager.GetBottleWorldPosition(bottle));
+            Vector3 rowEntry = WithPathY(zone2Manager.GetRowEntryWorldPosition(bottle));
+            Vector3? userWp = pathStartPoint != null ? pathStartPoint.position : (Vector3?)null;
+
+            // Coming straight from a previous bottle in the SAME row → just drive across the row.
+            if (previousBottle != null
+                && zone2Manager.GetBottleRow(previousBottle) == zone2Manager.GetBottleRow(bottle))
+            {
+                truck.DumpTargetWorldPos = finalTarget;
+                return;
+            }
+
+            // From a previous bottle in a DIFFERENT row → exit old row first, then user wp, then enter new row.
+            if (previousBottle != null)
+            {
+                Vector3 oldRowEntry = WithPathY(zone2Manager.GetRowEntryWorldPosition(previousBottle));
+                truck.DumpTargetWorldPos = oldRowEntry;
+                if (userWp.HasValue) truck.WaypointQueue.Enqueue(userWp.Value);
+                truck.WaypointQueue.Enqueue(rowEntry);
+                truck.WaypointQueue.Enqueue(finalTarget);
+                return;
+            }
+
+            // From conveyor: user wp → row entry → final.
+            if (userWp.HasValue)
+            {
+                truck.DumpTargetWorldPos = userWp.Value;
+                truck.WaypointQueue.Enqueue(rowEntry);
+                truck.WaypointQueue.Enqueue(finalTarget);
+            }
+            else
+            {
+                truck.DumpTargetWorldPos = rowEntry;
+                truck.WaypointQueue.Enqueue(finalTarget);
+            }
+        }
+
+        void BeginReturnToGarage(Truck truck, BigBottle fromBottle)
+        {
+            truck.State = TruckState.ReturningToGarage;
+            truck.WaypointQueue.Clear();
+            Vector3 garagePos = garageView.GetParkPositionFor(truck.Id);
+            Vector3? userWp = pathStartPoint != null ? pathStartPoint.position : (Vector3?)null;
+
+            if (fromBottle != null && zone2Manager != null)
+            {
+                Vector3 rowEntry = WithPathY(zone2Manager.GetRowEntryWorldPosition(fromBottle));
+                truck.DumpTargetWorldPos = rowEntry;
+                if (userWp.HasValue) truck.WaypointQueue.Enqueue(userWp.Value);
+                truck.WaypointQueue.Enqueue(garagePos);
+            }
+            else if (userWp.HasValue)
+            {
+                truck.DumpTargetWorldPos = userWp.Value;
+                truck.WaypointQueue.Enqueue(garagePos);
+            }
+            else
+            {
+                truck.DumpTargetWorldPos = garagePos;
+            }
+
+            if (truckViews.TryGetValue(truck.Id, out var view))
+                view.SetGaragePosition(garagePos);
+        }
+
+        bool TryRouteRemainingLoad(Truck truck, BigBottle previousBottle)
         {
             if (zone2Manager == null || truck.Load <= 0) return false;
             int reserved = 0;
             var bottle = zone2Manager.TryReserveTruckBottle(truck.FruitColor, truck.Load, out reserved);
             if (bottle == null) return false;
-            truck.State = TruckState.DrivingToBottle;
-            truck.DumpTargetWorldPos = zone2Manager.GetBottleWorldPosition(bottle);
-            truckTargetBottles[truck.Id] = bottle;
-            truckCurrentReservedAmount[truck.Id] = reserved;
+            BeginDriveToBottle(truck, bottle, reserved, fromConveyor: false, previousBottle: previousBottle);
             truckDumpEmitAccumulator.Remove(truck.Id);
             return true;
         }
@@ -419,8 +516,15 @@ namespace Project.Zone1.Trucks
                     float dist = Vector3.Distance(view.transform.position, truck.DumpTargetWorldPos);
                     if (dist <= dumpArriveDistance)
                     {
-                        truck.State = TruckState.Dumping;
-                        truckDumpEmitAccumulator[truck.Id] = 0f;
+                        if (truck.WaypointQueue.Count > 0)
+                        {
+                            truck.DumpTargetWorldPos = truck.WaypointQueue.Dequeue();
+                        }
+                        else
+                        {
+                            truck.State = TruckState.Dumping;
+                            truckDumpEmitAccumulator[truck.Id] = 0f;
+                        }
                     }
                 }
                 else if (truck.State == TruckState.Dumping)
@@ -464,45 +568,40 @@ namespace Project.Zone1.Trucks
                     // Reservation depleted? Reroute remaining load OR return.
                     if (currentReserved <= 0)
                     {
+                        var previousBottle = bottle;
                         truckTargetBottles.Remove(truck.Id);
                         truckCurrentReservedAmount.Remove(truck.Id);
 
-                        if (truck.Load > 0 && TryRouteRemainingLoad(truck))
+                        if (truck.Load > 0 && TryRouteRemainingLoad(truck, previousBottle))
                         {
-                            // truck.State = DrivingToBottle, target updated; loop continues next frame.
+                            // truck.State = DrivingToBottle, waypoint path rebuilt; loop continues next frame.
                         }
                         else
                         {
                             truck.EmptyLoad();
-                            truck.State = TruckState.ReturningToGarage;
                             truckDumpEmitAccumulator.Remove(truck.Id);
-                            if (truckViews.TryGetValue(truck.Id, out var v) && v != null)
-                                v.SetGaragePosition(garageView.GetParkPositionFor(truck.Id));
+                            BeginReturnToGarage(truck, previousBottle);
                         }
                     }
                 }
                 else if (truck.State == TruckState.ReturningToGarage)
                 {
                     if (!truckViews.TryGetValue(truck.Id, out var view) || view == null) continue;
-                    float dist = Vector3.Distance(view.transform.position, garageView.GetParkPositionFor(truck.Id));
+                    float dist = Vector3.Distance(view.transform.position, truck.DumpTargetWorldPos);
                     if (dist <= dumpArriveDistance)
-                        truck.State = TruckState.InGarage;
+                    {
+                        if (truck.WaypointQueue.Count > 0)
+                        {
+                            truck.DumpTargetWorldPos = truck.WaypointQueue.Dequeue();
+                        }
+                        else
+                        {
+                            truck.State = TruckState.InGarage;
+                        }
+                    }
                 }
             }
         }
 
-        float ApproximateTrackParamForWorldPos(Vector3 worldPos)
-        {
-            const int samples = 200;
-            float bestDist = float.PositiveInfinity, bestParam = 0f;
-            for (int i = 0; i < samples; i++)
-            {
-                float t = (float)i / samples;
-                Vector3 p = track.GetWorldPositionAtTrackParam(t);
-                float d = (p - worldPos).sqrMagnitude;
-                if (d < bestDist) { bestDist = d; bestParam = t; }
-            }
-            return bestParam;
-        }
     }
 }

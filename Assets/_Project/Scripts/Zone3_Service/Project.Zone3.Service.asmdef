@@ -1,0 +1,22 @@
+{
+    "name": "Project.Zone3.Service",
+    "rootNamespace": "Project.Zone3.Service",
+    "references": [
+        "Project.Core",
+        "Project.Data",
+        "Project.Input",
+        "Project.Zone1.FruitWall",
+        "Project.Zone2.Bottling",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

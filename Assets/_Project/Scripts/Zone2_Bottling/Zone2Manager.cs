@@ -35,14 +35,18 @@ namespace Project.Zone2.Bottling
 
         [Header("Camera (tap raycast)")]
         [SerializeField] Camera mainCamera;
+        [Tooltip("Layer mask dla raycastu tap-to-pour. Ustaw na warstwę butelek (np. 'Bottle'), żeby skały/podłogi nie blokowały.")]
+        [SerializeField] LayerMask tapRaycastMask = ~0;
 
         readonly List<BigBottle> bottles = new();
         readonly List<SmallBottleRack> racks = new();
         readonly List<BigBottleView> bottleViews = new();
         readonly List<SmallBottleRackView> rackViews = new();
 
-        [Header("Rack cap")]
-        [Tooltip("Maksymalna ilość racków. Jeśli 0 lub puste, używa wartości MaxBottles.")]
+        [Header("Caps")]
+        [Tooltip("Maksymalna ilość butelek. Jeśli 0, liczone z balance.StartingFruitTypes + LockedFruitTypes.")]
+        [SerializeField] int maxBottles = 0;
+        [Tooltip("Maksymalna ilość racków. Jeśli 0, używa MaxBottles.")]
         [SerializeField] int maxRacks = 0;
 
         public IReadOnlyList<BigBottle> Bottles => bottles;
@@ -53,6 +57,7 @@ namespace Project.Zone2.Bottling
         {
             get
             {
+                if (maxBottles > 0) return maxBottles;
                 if (balance == null) return 0;
                 int starting = balance.StartingFruitTypes?.Length ?? 0;
                 int locked = balance.LockedFruitTypes?.Length ?? 0;
@@ -160,7 +165,73 @@ namespace Project.Zone2.Bottling
             if (bottle == null) return null;
             int idx = bottles.IndexOf(bottle);
             if (idx < 0 || idx >= bottleViews.Count || bottleViews[idx] == null) return null;
-            return bottleViews[idx].transform;
+            return bottleViews[idx].FruitsDropAnchor;
+        }
+
+        public Vector3 GetRackWorldPosition(SmallBottleRack rack)
+        {
+            if (rack == null) return Vector3.zero;
+            int idx = racks.IndexOf(rack);
+            if (idx < 0 || idx >= rackViews.Count || rackViews[idx] == null) return Vector3.zero;
+            return rackViews[idx].transform.position;
+        }
+
+        public Transform GetRackTransform(SmallBottleRack rack)
+        {
+            if (rack == null) return null;
+            int idx = racks.IndexOf(rack);
+            if (idx < 0 || idx >= rackViews.Count || rackViews[idx] == null) return null;
+            return rackViews[idx].transform;
+        }
+
+        public int GetBottleRow(BigBottle bottle)
+        {
+            if (bottle == null) return -1;
+            int idx = bottles.IndexOf(bottle);
+            if (idx < 0) return -1;
+            return idx / Mathf.Max(1, bottlesPerRow);
+        }
+
+        public int BottlesPerRow => Mathf.Max(1, bottlesPerRow);
+        public int ActiveRowCount => Mathf.CeilToInt((float)bottles.Count / BottlesPerRow);
+        public int MaxRowCount => Mathf.CeilToInt((float)MaxBottles / BottlesPerRow);
+
+        /// <summary>
+        /// Returns the dump anchor world position of the FIRST bottle (col=0) in the same row as the given bottle.
+        /// Used as a routing waypoint so trucks enter the bottle row from a consistent point.
+        /// </summary>
+        public Vector3 GetRowEntryWorldPosition(BigBottle bottle)
+        {
+            int row = GetBottleRow(bottle);
+            return row < 0 ? transform.position : GetRowEntryWorldPositionByRow(row);
+        }
+
+        Vector3 PrefabDumpAnchorLocalOffset => bottlePrefab != null ? bottlePrefab.DumpAnchorLocalOffset : Vector3.zero;
+
+        public Vector3 GetRowEntryWorldPositionByRow(int row)
+        {
+            int bpr = BottlesPerRow;
+            int firstInRow = row * bpr;
+            if (firstInRow >= 0 && firstInRow < bottleViews.Count && bottleViews[firstInRow] != null)
+                return bottleViews[firstInRow].DumpAnchorWorldPosition;
+            Vector3 local = firstBottleOffset + row * bottleRowStepOffset + PrefabDumpAnchorLocalOffset;
+            return transform.TransformPoint(local);
+        }
+
+        /// <summary>
+        /// World position of the LAST column slot in a row (col = bottlesPerRow-1), even if no bottle is spawned there.
+        /// Uses each bottle's actual dump anchor when present, otherwise computes the same offset from the prefab,
+        /// so the path visualization stops *in front of* the bottle slot — never inside it.
+        /// </summary>
+        public Vector3 GetRowExitWorldPositionByRow(int row)
+        {
+            int bpr = BottlesPerRow;
+            int lastCol = bpr - 1;
+            int lastIdx = row * bpr + lastCol;
+            if (lastIdx >= 0 && lastIdx < bottleViews.Count && bottleViews[lastIdx] != null)
+                return bottleViews[lastIdx].DumpAnchorWorldPosition;
+            Vector3 local = firstBottleOffset + lastCol * bottleStepOffset + row * bottleRowStepOffset + PrefabDumpAnchorLocalOffset;
+            return transform.TransformPoint(local);
         }
 
         public void Deposit(BigBottle bottle, FruitType type, int amount)
@@ -190,14 +261,12 @@ namespace Project.Zone2.Bottling
             if (!tapPos.HasValue || mainCamera == null) return;
 
             Ray ray = mainCamera.ScreenPointToRay(tapPos.Value);
-            if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
-            {
-                var view = hit.collider.GetComponentInParent<BigBottleView>();
-                if (view == null) return;
-                int idx = bottleViews.IndexOf(view);
-                if (idx < 0 || idx >= bottles.Count) return;
-                PourBottleToBestRacks(bottles[idx]);
-            }
+            if (!Physics.Raycast(ray, out RaycastHit hit, 1000f, tapRaycastMask)) return;
+            var view = hit.collider.GetComponentInParent<BigBottleView>();
+            if (view == null) return;
+            int idx = bottleViews.IndexOf(view);
+            if (idx < 0 || idx >= bottles.Count) return;
+            PourBottleToBestRacks(bottles[idx]);
         }
 
         /// <summary>
@@ -224,6 +293,13 @@ namespace Project.Zone2.Bottling
                 if (bottle.IsEmpty) break;
                 if (r.IsEmpty)
                     total += PourController.Pour(bottle, r, balance.FruitsPerSmallBottle);
+            }
+
+            while (!bottle.IsEmpty && CanAddRack())
+            {
+                SpawnRack();
+                var fresh = racks[racks.Count - 1];
+                total += PourController.Pour(bottle, fresh, balance.FruitsPerSmallBottle);
             }
 
             return total;

@@ -12,6 +12,8 @@ namespace Project.Zone2.Bottling
         [SerializeField] Renderer juiceRenderer;
         [Tooltip("Anchor gdzie ciężarówka stoi przy zsypywaniu (offset od butelki). Jeśli null — używa transform.position.")]
         [SerializeField] Transform dumpAnchor;
+        [Tooltip("Anchor docelowy lecących owoców (zwykle nad/u góry butelki). Jeśli null — fallback na dumpAnchor, a potem transform.")]
+        [SerializeField] Transform fruitsDropAnchor;
         [Tooltip("Opcjonalny TMP label nad butelką — pokazuje procent napełnienia.")]
         [SerializeField] TMP_Text fillPercentText;
         [Tooltip("Szybkość lerp scaling soku (większe = szybsze nadążanie za FillAmount).")]
@@ -23,6 +25,10 @@ namespace Project.Zone2.Bottling
 
         public BigBottle Bottle => bottle;
         public Vector3 DumpAnchorWorldPosition => dumpAnchor != null ? dumpAnchor.position : transform.position;
+        public Vector3 DumpAnchorLocalOffset => dumpAnchor != null ? dumpAnchor.localPosition : Vector3.zero;
+        public Transform FruitsDropAnchor =>
+            fruitsDropAnchor != null ? fruitsDropAnchor :
+            dumpAnchor != null ? dumpAnchor : transform;
 
         public void Bind(BigBottle bottle)
         {

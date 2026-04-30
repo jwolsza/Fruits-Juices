@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Project.Core;
 using UnityEngine;
 
@@ -12,6 +13,7 @@ namespace Project.Zone1.Trucks
         public TruckState State { get; set; } = TruckState.InGarage;
         public float TrackPosition { get; set; }
         public Vector3 DumpTargetWorldPos { get; set; }
+        public Queue<Vector3> WaypointQueue { get; } = new();
 
         public bool IsFull => Load >= Capacity;
 

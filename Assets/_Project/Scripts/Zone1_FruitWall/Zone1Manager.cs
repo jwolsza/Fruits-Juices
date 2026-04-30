@@ -50,9 +50,11 @@ namespace Project.Zone1.FruitWall
             rng = new SystemRandomSource();
 
             RebuildActiveFruitTypes(0);
+            // Refill pool is driven by Zone1TrucksManager (only fruits matching owned trucks).
+            // Init empty — trucks populate it via SetRefillFruitPool after they spawn.
             refill = new RefillController(
                 grid,
-                activeFruitTypes.ToArray(),
+                new FruitType[0],
                 rng,
                 balance.RefillSpawnsPerTick);
 
@@ -60,13 +62,18 @@ namespace Project.Zone1.FruitWall
         }
 
         /// <summary>
-        /// Set how many extra (locked) fruit types are unlocked. extraUnlocked=0 → only StartingFruitTypes.
-        /// Updates RefillController's pool live.
+        /// Set how many extra (locked) fruit types are unlocked for purchase (FruitTypeSpawnerPanel).
+        /// Refill pool is NOT affected — that's driven by owned trucks via SetRefillFruitPool.
         /// </summary>
         public void SetExtraUnlockedTypes(int extraUnlocked)
         {
             RebuildActiveFruitTypes(extraUnlocked);
-            if (refill != null) refill.SetFruitPool(activeFruitTypes.ToArray());
+        }
+
+        /// <summary>Set the refill controller's fruit pool (caller decides which fruits can spawn).</summary>
+        public void SetRefillFruitPool(FruitType[] pool)
+        {
+            if (refill != null) refill.SetFruitPool(pool);
         }
 
         void RebuildActiveFruitTypes(int extraUnlocked)
@@ -125,12 +132,18 @@ namespace Project.Zone1.FruitWall
             }
         }
 
-        public void StartRefill()
+        /// <summary>Refill until grid.OccupiedCount reaches targetOccupied (no-op if already there).</summary>
+        public void StartRefill(int targetOccupied)
         {
             if (refill.IsRefilling || grid.IsFull) return;
-            refill.Start();
-            EmitRefillingChanged(true);
+            if (grid.OccupiedCount >= targetOccupied) return;
+            refill.Start(targetOccupied);
+            if (refill.IsRefilling) EmitRefillingChanged(true);
         }
+
+        public int GridCellCount => grid != null ? grid.Columns * grid.Rows : 0;
+        public int GridOccupiedCount => grid != null ? grid.OccupiedCount : 0;
+        public bool IsRefillInProgress => refill != null && refill.IsRefilling;
 
         void EmitRefillingChanged(bool isRefilling)
         {

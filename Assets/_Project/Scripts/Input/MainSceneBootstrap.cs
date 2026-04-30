@@ -35,6 +35,10 @@ namespace Project.Input
         CameraScrollController scroll;
         InputRouter router;
 
+        /// <summary>Output joysticka (X = right, Y = forward) w zakresie ~[-1,1]. Vector2.zero gdy nieaktywny.</summary>
+        public Vector2 JoystickOutput => joystick != null ? joystick.Output : Vector2.zero;
+        public bool JoystickActive => joystick != null && joystick.IsActive;
+
         bool pointerDown;
 
         void Awake()
