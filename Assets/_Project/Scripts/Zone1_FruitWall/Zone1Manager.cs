@@ -82,16 +82,15 @@ namespace Project.Zone1.FruitWall
         }
 
         /// <summary>
-        /// Grow the wall — adds rows at top + columns at right, keeping existing cells/fruits at
-        /// their original positions. Wall transform stays unscaled; visual growth comes from extra
-        /// cell instances (each cell stays the same world size).
+        /// Grow the wall — adds columns at left, columns at right, rows at top. Existing cells/fruits
+        /// stay at their original world positions (achieved by shifting WallView anchor).
         /// </summary>
-        public void GrowWall(int addCols, int addRows)
+        public void GrowWall(int addLeft, int addRight, int addTop)
         {
             if (grid == null || wallView == null) return;
-            if (addCols > 0) grid.AddColumnsAtRight(addCols);
-            if (addRows > 0) grid.AddRowsAtTop(addRows);
-            wallView.ResyncToGrid();
+            if (addLeft <= 0 && addRight <= 0 && addTop <= 0) return;
+            grid.Grow(addLeft, addRight, addTop);
+            wallView.OnGridGrew(addLeft, addRight, addTop);
         }
 
         void Update()
