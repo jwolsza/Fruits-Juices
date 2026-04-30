@@ -27,10 +27,8 @@ namespace Project.Zone1.Trucks
         [SerializeField] int addRowsPerLevel = 20;
 
         [Header("Wall visual scale (optional — Wall musi być OSOBNYM GameObject od WallView/Grid)")]
+        [Tooltip("Visual mesh ściany (osobny GameObject od WallView). Skala AUTO-liczona ze stosunku currentGrid/initialGrid, dzięki czemu rośnie razem z gridem.")]
         [SerializeField] Transform wallVisualTransform;
-        [SerializeField] float wallScaleBase = 0.5f;
-        [SerializeField] float wallScaleStepPerLevel = 0.05f;
-        [SerializeField] float wallScaleMax = 1.1f;
 
         [Header("Track expansion")]
         [SerializeField] float trackXStepPerLevel = 0.3f;
@@ -46,6 +44,9 @@ namespace Project.Zone1.Trucks
         Button button;
         int level;
         float baseTruckSpeed;
+        Vector3 initialVisualScale;
+        int initialGridCols;
+        int initialGridRows;
 
         public int Level => level;
 
@@ -54,7 +55,18 @@ namespace Project.Zone1.Trucks
             button = GetComponent<Button>();
             button.onClick.AddListener(Upgrade);
             if (trucksManager != null) baseTruckSpeed = trucksManager.TruckSpeedUnitsPerSec;
+            if (wallVisualTransform != null) initialVisualScale = wallVisualTransform.localScale;
             if (zone1Manager != null) zone1Manager.SetExtraUnlockedTypes(0);
+        }
+
+        void Start()
+        {
+            // Capture initial grid dimensions AFTER Zone1Manager.Awake created the grid.
+            if (zone1Manager != null && zone1Manager.Grid != null)
+            {
+                initialGridCols = zone1Manager.Grid.Columns;
+                initialGridRows = zone1Manager.Grid.Rows;
+            }
             ApplyVisualScale();
         }
 
@@ -79,8 +91,18 @@ namespace Project.Zone1.Trucks
         void ApplyVisualScale()
         {
             if (wallVisualTransform == null) return;
-            float scale = Mathf.Clamp(wallScaleBase + level * wallScaleStepPerLevel, wallScaleBase, wallScaleMax);
-            wallVisualTransform.localScale = new Vector3(scale, scale, scale);
+            if (initialGridCols <= 0 || initialGridRows <= 0) return;
+
+            int currentCols = initialGridCols + level * (addLeftColsPerLevel + addRightColsPerLevel);
+            int currentRows = initialGridRows + level * addRowsPerLevel;
+            float widthRatio = (float)currentCols / initialGridCols;
+            float heightRatio = (float)currentRows / initialGridRows;
+
+            // Wall jest rotowane -90X — local X = world X (cols), local Y = world Z (rows after rotation).
+            wallVisualTransform.localScale = new Vector3(
+                initialVisualScale.x * widthRatio,
+                initialVisualScale.y * heightRatio,
+                initialVisualScale.z);
         }
 
         void Update()
