@@ -15,6 +15,7 @@ namespace Project.Zone2.Bottling
         [SerializeField] BigBottleView bottlePrefab;
         [SerializeField] SmallBottleRackView rackPrefab;
         [SerializeField] int bottleCount = 3;
+        [SerializeField] int maxBottles = 8;
         [Tooltip("Pozycja pierwszej butelki (local Zone2Manager).")]
         [SerializeField] Vector3 firstBottleOffset = Vector3.zero;
         [Tooltip("Krok offsetu między butelkami.")]
@@ -34,6 +35,9 @@ namespace Project.Zone2.Bottling
 
         public IReadOnlyList<BigBottle> Bottles => bottles;
         public IReadOnlyList<SmallBottleRack> Racks => racks;
+        public int BottleCount => bottles.Count;
+        public int MaxBottles => maxBottles;
+        public bool CanAddBottle() => bottles.Count < maxBottles && bottlePrefab != null && rackPrefab != null;
 
         void Start()
         {
@@ -43,24 +47,35 @@ namespace Project.Zone2.Bottling
                 return;
             }
 
-            for (int i = 0; i < bottleCount; i++)
-            {
-                var bottleView = Instantiate(bottlePrefab, transform);
-                bottleView.name = $"BigBottle{i}";
-                bottleView.transform.localPosition = firstBottleOffset + i * bottleStepOffset;
-                var bottle = new BigBottle(i, balance.BigBottleCapacity);
-                bottles.Add(bottle);
-                bottleView.Bind(bottle);
-                bottleViews.Add(bottleView);
+            for (int i = 0; i < bottleCount; i++) SpawnBottleAndRack();
+        }
 
-                var rackView = Instantiate(rackPrefab, transform);
-                rackView.name = $"Rack{i}";
-                rackView.transform.localPosition = firstRackOffset + i * rackStepOffset;
-                var rack = new SmallBottleRack(i, balance.RackCapacity);
-                racks.Add(rack);
-                rackView.Bind(rack);
-                rackViews.Add(rackView);
-            }
+        public bool AddBottle()
+        {
+            if (!CanAddBottle()) return false;
+            SpawnBottleAndRack();
+            return true;
+        }
+
+        void SpawnBottleAndRack()
+        {
+            int i = bottles.Count;
+
+            var bottleView = Instantiate(bottlePrefab, transform);
+            bottleView.name = $"BigBottle{i}";
+            bottleView.transform.localPosition = firstBottleOffset + i * bottleStepOffset;
+            var bottle = new BigBottle(i, balance.BigBottleCapacity);
+            bottles.Add(bottle);
+            bottleView.Bind(bottle);
+            bottleViews.Add(bottleView);
+
+            var rackView = Instantiate(rackPrefab, transform);
+            rackView.name = $"Rack{i}";
+            rackView.transform.localPosition = firstRackOffset + i * rackStepOffset;
+            var rack = new SmallBottleRack(i, balance.RackCapacity);
+            racks.Add(rack);
+            rackView.Bind(rack);
+            rackViews.Add(rackView);
         }
 
         public BigBottle TryReserveTruckBottle(FruitType truckFruitColor, int truckLoad)
