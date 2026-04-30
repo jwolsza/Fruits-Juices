@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Project.Core;
 using Project.Data;
@@ -16,6 +17,8 @@ namespace Project.Zone1.FruitWall
         FruitGrid grid;
         RefillController refill;
         SystemRandomSource rng;
+        readonly List<FruitType> activeFruitTypes = new();
+        public IReadOnlyList<FruitType> ActiveFruitTypes => activeFruitTypes;
 
         public FruitGrid Grid => grid;
         public Transform WallTransform => wallView != null ? wallView.transform : null;
@@ -45,13 +48,37 @@ namespace Project.Zone1.FruitWall
 
             grid = new FruitGrid(balance.WallColumns, balance.WallRows);
             rng = new SystemRandomSource();
+
+            RebuildActiveFruitTypes(0);
             refill = new RefillController(
                 grid,
-                balance.StartingFruitTypes,
+                activeFruitTypes.ToArray(),
                 rng,
                 balance.RefillSpawnsPerTick);
 
             wallView.Initialize(grid, balance.WallWidthWorldUnits, balance.WallHeightWorldUnits);
+        }
+
+        /// <summary>
+        /// Set how many extra (locked) fruit types are unlocked. extraUnlocked=0 → only StartingFruitTypes.
+        /// Updates RefillController's pool live.
+        /// </summary>
+        public void SetExtraUnlockedTypes(int extraUnlocked)
+        {
+            RebuildActiveFruitTypes(extraUnlocked);
+            if (refill != null) refill.SetFruitPool(activeFruitTypes.ToArray());
+        }
+
+        void RebuildActiveFruitTypes(int extraUnlocked)
+        {
+            activeFruitTypes.Clear();
+            if (balance.StartingFruitTypes != null)
+                foreach (var t in balance.StartingFruitTypes) activeFruitTypes.Add(t);
+            if (balance.LockedFruitTypes != null)
+            {
+                int n = Mathf.Min(Mathf.Max(0, extraUnlocked), balance.LockedFruitTypes.Length);
+                for (int i = 0; i < n; i++) activeFruitTypes.Add(balance.LockedFruitTypes[i]);
+            }
         }
 
         void Update()

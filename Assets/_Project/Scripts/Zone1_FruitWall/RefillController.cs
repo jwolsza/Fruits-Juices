@@ -22,7 +22,7 @@ namespace Project.Zone1.FruitWall
     public class RefillController
     {
         readonly FruitGrid grid;
-        readonly FruitType[] fruitPool;
+        FruitType[] fruitPool;
         readonly IRandomSource random;
         readonly int spawnsPerTick;
 
@@ -36,6 +36,12 @@ namespace Project.Zone1.FruitWall
             this.fruitPool = fruitPool;
             this.random = random;
             this.spawnsPerTick = spawnsPerTick;
+        }
+
+        public void SetFruitPool(FruitType[] pool)
+        {
+            if (pool == null || pool.Length == 0) return;
+            fruitPool = pool;
         }
 
         public void Start()
