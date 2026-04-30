@@ -40,6 +40,10 @@ namespace Project.Input
         {
             isDragging = true;
 
+            // Klamruj jednoklatkowy skok — w Chrome WebGL gdy kursor wyjedzie poza canvas i wróci,
+            // Mouse.position skacze do nowej pozycji jednym frame'em → camera by lurchowała.
+            if (Mathf.Abs(pixelDeltaX) > 300f) return;
+
             // Inverted: drag right → world moves right under finger → camera moves LEFT.
             float worldDelta = -pixelDeltaX * PixelsToWorld;
             float newX = TargetX + worldDelta;

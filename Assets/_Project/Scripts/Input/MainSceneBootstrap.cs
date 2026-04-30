@@ -82,54 +82,67 @@ namespace Project.Input
             UpdateJoystickVisual();
         }
 
+        enum PointerSource { None, Touch, Mouse }
+        PointerSource activePointer = PointerSource.None;
+
         void HandlePointerInput()
         {
-            Vector2? pointerPos = null;
-            bool pressedThisFrame = false;
-            bool releasedThisFrame = false;
-
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-            {
-                pointerPos = Touchscreen.current.primaryTouch.position.ReadValue();
-                pressedThisFrame = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
-            }
-            else if (Mouse.current != null && Mouse.current.leftButton.isPressed)
-            {
-                pointerPos = Mouse.current.position.ReadValue();
-                pressedThisFrame = Mouse.current.leftButton.wasPressedThisFrame;
-            }
-
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasReleasedThisFrame)
-                releasedThisFrame = true;
-            else if (Mouse.current != null && Mouse.current.leftButton.wasReleasedThisFrame)
-                releasedThisFrame = true;
-
             float now = Time.time;
 
-            if (pressedThisFrame && pointerPos.HasValue)
+            // Wykryj rozpoczęcie nowego dotknięcia/kliknięcia. Lock device dla całego dragu — żeby
+            // browser-side pseudo-touch z myszy nie flickerował z prawdziwą myszą i nie podawał
+            // pozycji z dwóch różnych urządzeń per klatka.
+            if (!pointerDown)
             {
-                pointerDown = true;
-                router.OnPointerDown(pointerPos.Value, now);
+                if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+                {
+                    activePointer = PointerSource.Touch;
+                    pointerDown = true;
+                    router.OnPointerDown(Touchscreen.current.primaryTouch.position.ReadValue(), now);
+                    return;
+                }
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    activePointer = PointerSource.Mouse;
+                    pointerDown = true;
+                    router.OnPointerDown(Mouse.current.position.ReadValue(), now);
+                    return;
+                }
+                return;
             }
-            else if (pointerDown && releasedThisFrame)
+
+            // pointerDown == true: czytaj pozycję TYLKO z urządzenia które rozpoczęło drag.
+            switch (activePointer)
             {
-                Vector2 lastPos = pointerPos ?? GetLastKnownPointerPos();
-                router.OnPointerUp(lastPos, now);
-                pointerDown = false;
-            }
-            else if (pointerDown && pointerPos.HasValue)
-            {
-                router.OnPointerMove(pointerPos.Value, now);
+                case PointerSource.Touch:
+                    if (Touchscreen.current == null) { ForceRelease(now, Vector2.zero); return; }
+                    if (Touchscreen.current.primaryTouch.press.wasReleasedThisFrame)
+                    {
+                        ForceRelease(now, Touchscreen.current.primaryTouch.position.ReadValue());
+                        return;
+                    }
+                    if (Touchscreen.current.primaryTouch.press.isPressed)
+                        router.OnPointerMove(Touchscreen.current.primaryTouch.position.ReadValue(), now);
+                    break;
+
+                case PointerSource.Mouse:
+                    if (Mouse.current == null) { ForceRelease(now, Vector2.zero); return; }
+                    if (Mouse.current.leftButton.wasReleasedThisFrame)
+                    {
+                        ForceRelease(now, Mouse.current.position.ReadValue());
+                        return;
+                    }
+                    if (Mouse.current.leftButton.isPressed)
+                        router.OnPointerMove(Mouse.current.position.ReadValue(), now);
+                    break;
             }
         }
 
-        Vector2 GetLastKnownPointerPos()
+        void ForceRelease(float now, Vector2 pos)
         {
-            if (Touchscreen.current != null)
-                return Touchscreen.current.primaryTouch.position.ReadValue();
-            if (Mouse.current != null)
-                return Mouse.current.position.ReadValue();
-            return Vector2.zero;
+            router.OnPointerUp(pos, now);
+            pointerDown = false;
+            activePointer = PointerSource.None;
         }
 
         void ApplyCameraPosition()
