@@ -1289,7 +1289,7 @@ MonoBehaviour:
   rubberStrength: 2
   snapBackSpeed: 2
   drag: 5
-  playerZoneMinWorldX: 7
+  playerZoneMinWorldX: 7.5
   groundPlaneY: 0
   joystickMaxRadiusPx: 75
   joystickVisual: {fileID: 1146890696}
