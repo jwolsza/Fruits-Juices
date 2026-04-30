@@ -18,12 +18,19 @@ namespace Project.Zone2.Bottling
         [SerializeField] int maxBottles = 8;
         [Tooltip("Pozycja pierwszej butelki (local Zone2Manager).")]
         [SerializeField] Vector3 firstBottleOffset = Vector3.zero;
-        [Tooltip("Krok offsetu między butelkami.")]
+        [Tooltip("Krok offsetu w obrębie rzędu (zwykle X).")]
         [SerializeField] Vector3 bottleStepOffset = new(1f, 0f, 0f);
+        [Tooltip("Krok offsetu między rzędami butelek (zwykle Z).")]
+        [SerializeField] Vector3 bottleRowStepOffset = new(0f, 0f, 1f);
+        [Tooltip("Ile butelek mieści się w jednym rzędzie zanim zacznie się nowy.")]
+        [SerializeField] int bottlesPerRow = 4;
+
         [Tooltip("Pozycja pierwszego racka (local Zone2Manager).")]
         [SerializeField] Vector3 firstRackOffset = new(0f, 0f, 0.7f);
-        [Tooltip("Krok offsetu między rackami.")]
+        [Tooltip("Krok offsetu racków w rzędzie.")]
         [SerializeField] Vector3 rackStepOffset = new(1f, 0f, 0f);
+        [Tooltip("Krok offsetu między rzędami racków.")]
+        [SerializeField] Vector3 rackRowStepOffset = new(0f, 0f, 1f);
 
         [Header("Camera (tap raycast)")]
         [SerializeField] Camera mainCamera;
@@ -60,10 +67,15 @@ namespace Project.Zone2.Bottling
         void SpawnBottleAndRack()
         {
             int i = bottles.Count;
+            int perRow = Mathf.Max(1, bottlesPerRow);
+            int col = i % perRow;
+            int row = i / perRow;
 
             var bottleView = Instantiate(bottlePrefab, transform);
             bottleView.name = $"BigBottle{i}";
-            bottleView.transform.localPosition = firstBottleOffset + i * bottleStepOffset;
+            bottleView.transform.localPosition = firstBottleOffset
+                                                 + col * bottleStepOffset
+                                                 + row * bottleRowStepOffset;
             var bottle = new BigBottle(i, balance.BigBottleCapacity);
             bottles.Add(bottle);
             bottleView.Bind(bottle);
@@ -71,7 +83,9 @@ namespace Project.Zone2.Bottling
 
             var rackView = Instantiate(rackPrefab, transform);
             rackView.name = $"Rack{i}";
-            rackView.transform.localPosition = firstRackOffset + i * rackStepOffset;
+            rackView.transform.localPosition = firstRackOffset
+                                               + col * rackStepOffset
+                                               + row * rackRowStepOffset;
             var rack = new SmallBottleRack(i, balance.RackCapacity);
             racks.Add(rack);
             rackView.Bind(rack);
