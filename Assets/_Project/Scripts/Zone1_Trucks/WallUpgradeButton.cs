@@ -98,11 +98,12 @@ namespace Project.Zone1.Trucks
             float widthRatio = (float)currentCols / initialGridCols;
             float heightRatio = (float)currentRows / initialGridRows;
 
-            // Wall jest rotowane -90X — local X = world X (cols), local Y = world Z (rows after rotation).
+            // Skaluj X przez widthRatio (cols dimension) i Y+Z przez heightRatio
+            // (działa niezależnie od orientacji mesha — czy wymiar "rows" jest na local Y czy Z).
             wallVisualTransform.localScale = new Vector3(
                 initialVisualScale.x * widthRatio,
                 initialVisualScale.y * heightRatio,
-                initialVisualScale.z);
+                initialVisualScale.z * heightRatio);
         }
 
         void Update()
