@@ -31,6 +31,8 @@ namespace Project.Zone2.Bottling
         [SerializeField] Vector3 rackStepOffset = new(1f, 0f, 0f);
         [Tooltip("Krok offsetu między rzędami racków.")]
         [SerializeField] Vector3 rackRowStepOffset = new(0f, 0f, 1f);
+        [Tooltip("Ile racków mieści się w jednym rzędzie zanim zacznie się nowy.")]
+        [SerializeField] int racksPerRow = 4;
 
         [Header("Camera (tap raycast)")]
         [SerializeField] Camera mainCamera;
@@ -67,15 +69,20 @@ namespace Project.Zone2.Bottling
         void SpawnBottleAndRack()
         {
             int i = bottles.Count;
-            int perRow = Mathf.Max(1, bottlesPerRow);
-            int col = i % perRow;
-            int row = i / perRow;
+
+            int bottlePerRow = Mathf.Max(1, bottlesPerRow);
+            int bCol = i % bottlePerRow;
+            int bRow = i / bottlePerRow;
+
+            int rackPerRow = Mathf.Max(1, racksPerRow);
+            int rCol = i % rackPerRow;
+            int rRow = i / rackPerRow;
 
             var bottleView = Instantiate(bottlePrefab, transform);
             bottleView.name = $"BigBottle{i}";
             bottleView.transform.localPosition = firstBottleOffset
-                                                 + col * bottleStepOffset
-                                                 + row * bottleRowStepOffset;
+                                                 + bCol * bottleStepOffset
+                                                 + bRow * bottleRowStepOffset;
             var bottle = new BigBottle(i, balance.BigBottleCapacity);
             bottles.Add(bottle);
             bottleView.Bind(bottle);
@@ -84,8 +91,8 @@ namespace Project.Zone2.Bottling
             var rackView = Instantiate(rackPrefab, transform);
             rackView.name = $"Rack{i}";
             rackView.transform.localPosition = firstRackOffset
-                                               + col * rackStepOffset
-                                               + row * rackRowStepOffset;
+                                               + rCol * rackStepOffset
+                                               + rRow * rackRowStepOffset;
             var rack = new SmallBottleRack(i, balance.RackCapacity);
             racks.Add(rack);
             rackView.Bind(rack);
@@ -148,8 +155,37 @@ namespace Project.Zone2.Bottling
                 if (view == null) return;
                 int idx = bottleViews.IndexOf(view);
                 if (idx < 0 || idx >= bottles.Count) return;
-                PourController.Pour(bottles[idx], racks[idx], balance.FruitsPerSmallBottle);
+                PourBottleToBestRacks(bottles[idx]);
             }
+        }
+
+        /// <summary>
+        /// Pours a bottle's content across racks. Priority:
+        /// 1) racks already containing matching type (fill them first),
+        /// 2) empty/unreserved racks.
+        /// Stops when bottle is empty or all racks are full.
+        /// </summary>
+        public int PourBottleToBestRacks(BigBottle bottle)
+        {
+            if (bottle == null || bottle.IsEmpty || !bottle.CurrentType.HasValue) return 0;
+            int total = 0;
+            var type = bottle.CurrentType.Value;
+
+            foreach (var r in racks)
+            {
+                if (bottle.IsEmpty) break;
+                if (r.CurrentType.HasValue && r.CurrentType.Value == type && !r.IsFull)
+                    total += PourController.Pour(bottle, r, balance.FruitsPerSmallBottle);
+            }
+
+            foreach (var r in racks)
+            {
+                if (bottle.IsEmpty) break;
+                if (r.IsEmpty)
+                    total += PourController.Pour(bottle, r, balance.FruitsPerSmallBottle);
+            }
+
+            return total;
         }
     }
 }
