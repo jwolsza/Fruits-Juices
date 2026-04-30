@@ -103,6 +103,11 @@ namespace Project.Editor
             body.transform.localPosition = new Vector3(0, 0.6f, 0);
             body.GetComponent<MeshRenderer>().sharedMaterial = glassMat;
 
+            // Dump anchor — gdzie ciężarówka się zatrzymuje przed butelką (offset w -Z, ku kamerze).
+            var dumpAnchor = new GameObject("DumpAnchor");
+            dumpAnchor.transform.SetParent(root.transform, false);
+            dumpAnchor.transform.localPosition = new Vector3(0f, 0f, -0.6f);
+
             // Juice pivot + inner cylinder (scale.y animated)
             var pivot = new GameObject("JuicePivot");
             pivot.transform.SetParent(root.transform, false);
@@ -125,6 +130,7 @@ namespace Project.Editor
             var so = new SerializedObject(view);
             so.FindProperty("juiceFillPivot").objectReferenceValue = pivot.transform;
             so.FindProperty("juiceRenderer").objectReferenceValue = juiceMr;
+            so.FindProperty("dumpAnchor").objectReferenceValue = dumpAnchor.transform;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, BigBottlePrefabPath);

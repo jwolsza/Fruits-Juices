@@ -78,6 +78,14 @@ namespace Project.Zone2.Bottling
             return bottleViews[idx].DumpAnchorWorldPosition;
         }
 
+        public Transform GetBottleTransform(BigBottle bottle)
+        {
+            if (bottle == null) return null;
+            int idx = bottles.IndexOf(bottle);
+            if (idx < 0 || idx >= bottleViews.Count || bottleViews[idx] == null) return null;
+            return bottleViews[idx].transform;
+        }
+
         public void Deposit(BigBottle bottle, FruitType type, int amount)
         {
             if (bottle == null) return;

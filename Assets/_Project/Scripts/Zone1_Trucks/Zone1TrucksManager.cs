@@ -60,6 +60,10 @@ namespace Project.Zone1.Trucks
         [SerializeField] float dumpArriveDistance = 0.3f;
         [Tooltip("Czas trwania stanu Dumping (sec) zanim truck wraca do garażu.")]
         [SerializeField] float dumpDurationSec = 0.6f;
+        [Tooltip("Ile lecących owoców emitować podczas dump (visual cap, niezależne od truck.Load).")]
+        [SerializeField] int dumpFlyingFruitCount = 12;
+        [Tooltip("Rozmiar (world) lecącego owocu z ciężarówki do butelki.")]
+        [SerializeField] Vector2 dumpFruitSize = new(0.1f, 0.1f);
 
         ConveyorTrack track;
         Garage garage;
@@ -401,7 +405,25 @@ namespace Project.Zone1.Trucks
                     if (dist <= dumpArriveDistance)
                     {
                         if (truckTargetBottles.TryGetValue(truck.Id, out var bottle) && zone2Manager != null)
+                        {
+                            // Visual: emit flying fruits truck → bottle (reuse pool from Plan #3).
+                            if (flyingFruitPool != null)
+                            {
+                                var bottleTransform = zone2Manager.GetBottleTransform(bottle);
+                                if (bottleTransform != null)
+                                {
+                                    int n = Mathf.Min(truck.Load, dumpFlyingFruitCount);
+                                    for (int k = 0; k < n; k++)
+                                        flyingFruitPool.Fly(
+                                            bottleTransform,
+                                            view.transform.position,
+                                            Quaternion.identity,
+                                            truck.FruitColor,
+                                            dumpFruitSize);
+                                }
+                            }
                             zone2Manager.Deposit(bottle, truck.FruitColor, truck.Load);
+                        }
                         truck.EmptyLoad();
                         truck.State = TruckState.Dumping;
                         truckDumpTimer[truck.Id] = dumpDurationSec;
