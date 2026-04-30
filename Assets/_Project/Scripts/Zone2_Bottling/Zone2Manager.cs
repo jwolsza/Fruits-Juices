@@ -107,11 +107,21 @@ namespace Project.Zone2.Bottling
             rackViews.Add(rackView);
         }
 
-        public BigBottle TryReserveTruckBottle(FruitType truckFruitColor, int truckLoad)
+        /// <summary>
+        /// Route + reserve in one shot. Reserves up to min(truckLoad, freeSpace).
+        /// Returns null if no bottle accepts even partial reservation.
+        /// </summary>
+        public BigBottle TryReserveTruckBottle(FruitType truckFruitColor, int truckLoad, out int reservedAmount)
         {
+            reservedAmount = 0;
             var bottle = BigBottleRouter.FindBottleFor(truckFruitColor, truckLoad, bottles);
             if (bottle == null) return null;
-            return bottle.TryReserve(truckFruitColor, truckLoad) ? bottle : null;
+            int free = bottle.Capacity - bottle.EffectiveLoad;
+            int amount = Mathf.Min(truckLoad, free);
+            if (amount <= 0) return null;
+            if (!bottle.TryReserve(truckFruitColor, amount)) return null;
+            reservedAmount = amount;
+            return bottle;
         }
 
         public Vector3 GetBottleWorldPosition(BigBottle bottle)
