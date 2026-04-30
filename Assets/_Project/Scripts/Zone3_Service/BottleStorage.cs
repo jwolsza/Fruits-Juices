@@ -51,28 +51,30 @@ namespace Project.Zone3.Service
             return false;
         }
 
-        /// <summary>Wyjmij dowolną (najstarszą) butelkę — używane gdy typ nie ma znaczenia.</summary>
+        /// <summary>Wyjmij topową (ostatnio dodaną) butelkę — bez dziur w stosie.</summary>
         public bool TryTakeAny(out Vector3 fromWorld)
         {
             if (entries.Count == 0) { fromWorld = transform.position; return false; }
-            var e = entries[0];
+            int last = entries.Count - 1;
+            var e = entries[last];
             fromWorld = e.Go != null ? e.Go.transform.position : transform.position;
             if (e.Go != null) Destroy(e.Go);
             usedSlots.Remove(e.SlotIndex);
-            entries.RemoveAt(0);
+            entries.RemoveAt(last);
             return true;
         }
 
         /// <summary>
-        /// Wyjmij najstarszą butelkę i odpal jej animację do targetParent (np. klient).
+        /// Wyjmij topową butelkę i odpal animację do targetParent (np. klient).
         /// Po dotarciu visual sam się niszczy. Zwraca false gdy storage pusty.
         /// </summary>
         public bool TryTakeAnyFlyTo(Transform targetParent, Vector3 targetLocalOffset, float duration, float arcHeight)
         {
             if (entries.Count == 0 || targetParent == null) return false;
-            var e = entries[0];
+            int last = entries.Count - 1;
+            var e = entries[last];
             usedSlots.Remove(e.SlotIndex);
-            entries.RemoveAt(0);
+            entries.RemoveAt(last);
 
             if (e.Go == null) return true;
             Vector3 fromWorld = e.Go.transform.position;

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Fruits_Juices</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        background: #231F20;
+        font-family: sans-serif;
+        color: #fff;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
+      #unity-container {
+        position: absolute;
+        inset: 0;
+      }
+      #unity-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: #231F20;
+      }
+      #unity-loading-bar {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        text-align: center;
+      }
+      #unity-progress-bar-empty {
+        width: 240px;
+        height: 14px;
+        margin: 8px auto 0;
+        background: #444;
+        border-radius: 7px;
+        overflow: hidden;
+      }
+      #unity-progress-bar-full {
+        width: 0%;
+        height: 100%;
+        background: #ffd54a;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="unity-container">
+      <canvas id="unity-canvas" tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div>Loading Fruits_Juices…</div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+    </div>
+    <script src="Build/Web.loader.js"></script>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
+
+      var config = {
+        dataUrl: "Build/Web.data",
+        frameworkUrl: "Build/Web.framework.js",
+        codeUrl: "Build/Web.wasm",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Fruits_Juices",
+        productVersion: "0.1.0"
+      };
+
+      loadingBar.style.display = "block";
+
+      createUnityInstance(canvas, config, (progress) => {
+        progressBarFull.style.width = (100 * progress) + "%";
+      }).then((unityInstance) => {
+        loadingBar.style.display = "none";
+        window.unityInstance = unityInstance;
+      }).catch((message) => {
+        alert(message);
+      });
+
+      // Resize canvas backing store on window resize so DPI / orientation changes work properly.
+      function resize() {
+        var dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(canvas.clientWidth * dpr);
+        canvas.height = Math.round(canvas.clientHeight * dpr);
+      }
+      window.addEventListener("resize", resize);
+      window.addEventListener("orientationchange", resize);
+      resize();
+    </script>
+  </body>
+</html>

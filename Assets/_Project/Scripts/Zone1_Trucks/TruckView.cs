@@ -9,6 +9,10 @@ namespace Project.Zone1.Trucks
     {
         [Tooltip("Lista renderów które dostają kolor odpowiadający typowi owocu trucka.")]
         [SerializeField] List<Renderer> coloredRenderers = new();
+        [Tooltip("Renderery na których podmieniany jest losowy material z listy poniżej (dekoracje, kolor karoserii, koła).")]
+        [SerializeField] List<Renderer> randomMaterialRenderers = new();
+        [Tooltip("Lista materiałów — losowany jest jeden i przypisywany WSZYSTKIM rendererom z randomMaterialRenderers.")]
+        [SerializeField] List<Material> randomMaterials = new();
         [Tooltip("Pivot, którego Y-scale rośnie z Load/Capacity (0..1). Box renderer powinien być jego dzieckiem.")]
         [SerializeField] Transform boxPivot;
         [Tooltip("Opcjonalny TMP label (TextMeshPro 3D albo TextMeshProUGUI) — wyświetla procent napełnienia trucka (np. \"75%\").")]
@@ -30,6 +34,7 @@ namespace Project.Zone1.Trucks
             this.track = track;
             this.garageParkPosition = garageParkPosition;
             ApplyColor();
+            ApplyRandomMaterial();
         }
 
         public void SetGaragePosition(Vector3 pos) => garageParkPosition = pos;
@@ -51,6 +56,19 @@ namespace Project.Zone1.Trucks
             {
                 int percent = Mathf.RoundToInt(fill * 100f);
                 fillPercentText.text = $"{percent}%";
+            }
+        }
+
+        void ApplyRandomMaterial()
+        {
+            if (randomMaterials == null || randomMaterials.Count == 0) return;
+            if (randomMaterialRenderers == null || randomMaterialRenderers.Count == 0) return;
+            var mat = randomMaterials[Random.Range(0, randomMaterials.Count)];
+            if (mat == null) return;
+            foreach (var r in randomMaterialRenderers)
+            {
+                if (r == null) continue;
+                r.sharedMaterial = mat;
             }
         }
 
