@@ -40,8 +40,16 @@ namespace Project.Zone2.Bottling
             }
         }
 
-        public BigBottle TryRouteTruck(FruitType truckFruitColor, int truckLoad) =>
-            BigBottleRouter.FindBottleFor(truckFruitColor, truckLoad, bottles);
+        /// <summary>
+        /// Route + reserve in one shot. If no bottle available or reservation fails, returns null.
+        /// Caller (Zone1TrucksManager) should call Deposit on arrival to commit the reservation.
+        /// </summary>
+        public BigBottle TryReserveTruckBottle(FruitType truckFruitColor, int truckLoad)
+        {
+            var bottle = BigBottleRouter.FindBottleFor(truckFruitColor, truckLoad, bottles);
+            if (bottle == null) return null;
+            return bottle.TryReserve(truckFruitColor, truckLoad) ? bottle : null;
+        }
 
         public Vector3 GetBottleWorldPosition(BigBottle bottle)
         {
@@ -54,7 +62,13 @@ namespace Project.Zone2.Bottling
         public void Deposit(BigBottle bottle, FruitType type, int amount)
         {
             if (bottle == null) return;
-            bottle.Receive(type, amount);
+            bottle.CommitReservation(type, amount);
+        }
+
+        public void CancelReservation(BigBottle bottle, int amount)
+        {
+            if (bottle == null) return;
+            bottle.CancelReservation(amount);
         }
 
         void Update()

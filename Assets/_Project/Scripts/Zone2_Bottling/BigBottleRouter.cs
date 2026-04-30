@@ -14,20 +14,21 @@ namespace Project.Zone2.Bottling
         {
             if (bottles == null) return null;
 
-            BigBottle anyEmpty = null;
+            BigBottle anyAvailable = null;
 
             foreach (var b in bottles)
             {
-                if (b.CurrentType.HasValue
-                    && b.CurrentType.Value == truckFruitColor
-                    && b.FillAmount + truckLoad <= b.Capacity)
+                var effective = b.EffectiveType;
+                if (effective.HasValue
+                    && effective.Value == truckFruitColor
+                    && b.EffectiveLoad + truckLoad <= b.Capacity)
                 {
                     return b;
                 }
-                if (b.IsEmpty && anyEmpty == null) anyEmpty = b;
+                if (!effective.HasValue && anyAvailable == null) anyAvailable = b;
             }
 
-            return anyEmpty;
+            return anyAvailable;
         }
     }
 }

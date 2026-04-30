@@ -368,7 +368,7 @@ namespace Project.Zone1.Trucks
                 // Try to route to a compatible bottle. If no Zone2 or no compatible bottle —
                 // fall back to direct return to garage (placeholder behavior).
                 BigBottle bottle = zone2Manager != null
-                    ? zone2Manager.TryRouteTruck(truck.FruitColor, truck.Load)
+                    ? zone2Manager.TryReserveTruckBottle(truck.FruitColor, truck.Load)
                     : null;
 
                 track.RemoveTruckFromSlot(truck);
