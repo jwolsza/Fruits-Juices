@@ -41,9 +41,14 @@ namespace Project.Zone2.Bottling
         readonly List<BigBottleView> bottleViews = new();
         readonly List<SmallBottleRackView> rackViews = new();
 
+        [Header("Rack cap")]
+        [Tooltip("Maksymalna ilość racków. Jeśli 0 lub puste, używa wartości MaxBottles.")]
+        [SerializeField] int maxRacks = 0;
+
         public IReadOnlyList<BigBottle> Bottles => bottles;
         public IReadOnlyList<SmallBottleRack> Racks => racks;
         public int BottleCount => bottles.Count;
+        public int RackCount => racks.Count;
         public int MaxBottles
         {
             get
@@ -54,7 +59,9 @@ namespace Project.Zone2.Bottling
                 return starting + locked;
             }
         }
+        public int MaxRacks => maxRacks > 0 ? maxRacks : MaxBottles;
         public bool CanAddBottle() => bottles.Count < MaxBottles && bottlePrefab != null && rackPrefab != null;
+        public bool CanAddRack() => racks.Count < MaxRacks && rackPrefab != null;
 
         void Start()
         {
@@ -76,15 +83,16 @@ namespace Project.Zone2.Bottling
 
         void SpawnBottleAndRack()
         {
-            int i = bottles.Count;
+            SpawnBottle();
+            if (CanAddRack()) SpawnRack();
+        }
 
+        void SpawnBottle()
+        {
+            int i = bottles.Count;
             int bottlePerRow = Mathf.Max(1, bottlesPerRow);
             int bCol = i % bottlePerRow;
             int bRow = i / bottlePerRow;
-
-            int rackPerRow = Mathf.Max(1, racksPerRow);
-            int rCol = i % rackPerRow;
-            int rRow = i / rackPerRow;
 
             var bottleView = Instantiate(bottlePrefab, transform);
             bottleView.name = $"BigBottle{i}";
@@ -95,6 +103,14 @@ namespace Project.Zone2.Bottling
             bottles.Add(bottle);
             bottleView.Bind(bottle);
             bottleViews.Add(bottleView);
+        }
+
+        void SpawnRack()
+        {
+            int i = racks.Count;
+            int rackPerRow = Mathf.Max(1, racksPerRow);
+            int rCol = i % rackPerRow;
+            int rRow = i / rackPerRow;
 
             var rackView = Instantiate(rackPrefab, transform);
             rackView.name = $"Rack{i}";
@@ -105,6 +121,13 @@ namespace Project.Zone2.Bottling
             racks.Add(rack);
             rackView.Bind(rack);
             rackViews.Add(rackView);
+        }
+
+        public bool AddRack()
+        {
+            if (!CanAddRack()) return false;
+            SpawnRack();
+            return true;
         }
 
         /// <summary>
