@@ -1,3 +1,4 @@
+using UnityEngine;
 using Project.Core;
 
 namespace Project.Zone1.FruitWall
