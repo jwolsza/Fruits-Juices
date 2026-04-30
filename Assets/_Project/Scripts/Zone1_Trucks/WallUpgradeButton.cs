@@ -7,17 +7,26 @@ namespace Project.Zone1.Trucks
 {
     /// <summary>
     /// UI Button — każde kliknięcie:
-    /// 1) zwiększa scale Wall transformu o stepPerLevel (clamped do maxScale)
-    /// 2) odblokowuje kolejny typ owocu w Zone1Manager (extra unlocked = level, capped)
+    /// 1) zwiększa scale Wall transformu o stepPerLevel (clamped do maxScale),
+    /// 2) odblokowuje kolejny typ owocu (Zone1Manager.SetExtraUnlockedTypes(level)),
+    /// 3) rozszerza conveyor track o trackXStepPerLevel (Zone1TrucksManager.ExpandTrack).
     /// </summary>
     [RequireComponent(typeof(Button))]
     public class WallUpgradeButton : MonoBehaviour
     {
         [SerializeField] Transform wallTransform;
         [SerializeField] Zone1Manager zone1Manager;
+        [SerializeField] Zone1TrucksManager trucksManager;
+
+        [Header("Wall scale")]
         [SerializeField] float baseScale = 0.5f;
         [SerializeField] float maxScale = 1.1f;
         [SerializeField] float stepPerLevel = 0.05f;
+
+        [Header("Track expansion")]
+        [Tooltip("Ile world units rozszerzyć conveyor (lewy bok -X, prawy bok +X) per upgrade level.")]
+        [SerializeField] float trackXStepPerLevel = 0.3f;
+
         [SerializeField] TMP_Text label;
 
         Button button;
@@ -29,19 +38,19 @@ namespace Project.Zone1.Trucks
         {
             button = GetComponent<Button>();
             button.onClick.AddListener(Upgrade);
-            ApplyAll();
+            ApplyScaleAndTypes();
         }
 
         void Upgrade()
         {
-            if (wallTransform == null) return;
             float next = baseScale + (level + 1) * stepPerLevel;
             if (next > maxScale + 0.0001f) return;
             level++;
-            ApplyAll();
+            ApplyScaleAndTypes();
+            if (trucksManager != null) trucksManager.ExpandTrack(trackXStepPerLevel);
         }
 
-        void ApplyAll()
+        void ApplyScaleAndTypes()
         {
             if (wallTransform != null)
             {
